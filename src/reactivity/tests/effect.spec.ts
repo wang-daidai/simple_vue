@@ -18,18 +18,18 @@ describe("effect", () => {
     expect(nextAge).toBe(12);
   });
 
-  //   it.skip("return runner", () => {
-  //     //1.effect => runner  runner()=>fn()
-  //     let foo = 10;
-  //     const runner = effect(() => {
-  //       foo++;
-  //       return "foo";
-  //     });
+  it("return runner", () => {
+    //1.effect => runner  runner()=>fn()
+    let foo = 10;
+    const runner = effect(() => {
+      foo++;
+      return "foo";
+    });
 
-  //     const result = runner();
-  //     expect(foo).toBe(12);
-  //     expect(result).toBe("foo");
-  //   });
+    const result = runner();
+    expect(foo).toBe(12);
+    expect(result).toBe("foo");
+  });
 
   /**
    * 1.通过effect的第二个参数给定的一个scheduler的fn

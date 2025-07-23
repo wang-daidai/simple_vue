@@ -36,4 +36,6 @@ let activeEffect: any = null;
 export function effect(fn: () => void, options: any = {}) {
   const _effect = new ReactiveEffect(fn);
   _effect.run();
+  const runner = _effect.run.bind(_effect);
+  return runner;
 }
