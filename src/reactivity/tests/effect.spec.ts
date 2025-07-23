@@ -62,7 +62,7 @@ describe("effect", () => {
     expect(dummy).toBe(1);
 
     //再次执行run时调用的是前一个
-    run();
+    run!();
     expect(dummy).toBe(2);
   });
 

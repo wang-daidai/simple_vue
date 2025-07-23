@@ -1,22 +1,33 @@
-import { reactive } from "../reactive";
+import { reactive, isReactive, toRaw } from "../reactive";
 
 describe("reactive", () => {
   it("happy path", () => {
-    const original = { foo: 1, bar: { baz: 2 } };
+    const original = { foo: 1 };
     const observed = reactive(original);
+    expect(observed).not.toBe(original);
+    expect(isReactive(observed)).toBe(true);
+    expect(isReactive(original)).toBe(false);
+    expect(observed.foo).toBe(1);
+    expect("foo" in observed).toBe(true);
   });
 
-  it.skip("nested reactive", () => {
+  it("nested reactive", () => {
     const original = {
       nested: { foo: 1 },
       array: [{ bar: 2 }],
     };
 
-    // const observed = reactive(original);
-    // expect(isReactive(observed.nested)).toBe(true);
-    // expect(isReactive(observed.array)).toBe(true);
-    // expect(isReactive(observed.array[0])).toBe(true);
+    const observed = reactive(original);
+    expect(isReactive(observed.nested)).toBe(true);
+    expect(isReactive(observed.array)).toBe(true);
+    expect(isReactive(observed.array[0])).toBe(true);
 
     // expect(isProxy(observed.nested)).toBe(true);
+  });
+  it.skip("toRaw", () => {
+    const original = { foo: 1 };
+    const observed = reactive(original);
+    expect(toRaw(observed)).toBe(original);
+    expect(toRaw(original)).toBe(original);
   });
 });
