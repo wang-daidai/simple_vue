@@ -1,5 +1,5 @@
 import { reactive } from "../reactive";
-import { effect } from "../effect";
+import { effect, stop } from "../effect";
 describe("effect", () => {
   it("happy path", () => {
     const user = reactive({
@@ -37,69 +37,71 @@ describe("effect", () => {
    * 3.当响应式对象set 时，不会执行fn而是执行scheduler
    * 4.当执行runner时后，会再次执行fn
    */
-  //   it.skip("scheduler", () => {
-  //     let dummy;
-  //     let run;
-  //     const scheduler = jest.fn(() => {
-  //       run = runner;
-  //     });
+  it("scheduler", () => {
+    let dummy;
+    let run;
+    const scheduler = jest.fn(() => {
+      run = runner;
+    });
 
-  //     const obj = reactive({ foo: 1 });
-  //     //effect里面可以传入两个参数
-  //     const runner = effect(
-  //       () => {
-  //         dummy = obj.foo;
-  //       },
-  //       { scheduler }
-  //     );
-  //     //第一次执行时，后面一个函数不会调用
-  //     expect(scheduler).not.toHaveBeenCalled();
-  //     expect(dummy).toBe(1);
+    const obj = reactive({ foo: 1 });
+    //effect里面可以传入两个参数
+    const runner = effect(
+      () => {
+        dummy = obj.foo;
+      },
+      { scheduler }
+    );
+    //第一次执行时，后面一个函数不会调用
+    expect(scheduler).not.toHaveBeenCalled();
+    expect(dummy).toBe(1);
 
-  //     //修改obj中的值时，调用scheduler
-  //     obj.foo++;
-  //     expect(scheduler).toHaveBeenCalledTimes(1);
-  //     expect(dummy).toBe(1);
+    //修改obj中的值时，调用scheduler
+    obj.foo++;
+    expect(scheduler).toHaveBeenCalledTimes(1);
+    expect(dummy).toBe(1);
 
-  //     //再次执行run时调用的是前一个
-  //     run();
-  //     expect(dummy).toBe(2);
-  //   });
+    //再次执行run时调用的是前一个
+    run();
+    expect(dummy).toBe(2);
+  });
 
-  //   it.skip("stop", () => {
-  //     let dummy;
-  //     const obj = reactive({ prop: 1 });
-  //     const runner = effect(() => {
-  //       dummy = obj.prop;
-  //     });
+  //stop 删除依赖
+  it("stop", () => {
+    let dummy;
+    const obj = reactive({ prop: 1 });
+    const runner = effect(() => {
+      dummy = obj.prop;
+    });
 
-  //     obj.prop = 2;
-  //     expect(dummy).toBe(2);
-  //     stop(runner);
-  //     // obj.prop = 3;
-  //     obj.prop++;
+    obj.prop = 2;
+    expect(dummy).toBe(2);
+    stop(runner);
+    // obj.prop = 3;
+    obj.prop++;
 
-  //     expect(dummy).toBe(2);
+    expect(dummy).toBe(2);
 
-  //     runner();
-  //     expect(dummy).toBe(3);
-  //   });
+    runner();
+    expect(dummy).toBe(3);
+  });
 
-  //   it.skip("onStop", () => {
-  //     const obj = reactive({
-  //       foo: 1,
-  //     });
-  //     const onStop = jest.fn();
-  //     let dummy;
-  //     const runner = effect(
-  //       () => {
-  //         dummy = obj.foo;
-  //       },
-  //       {
-  //         onStop,
-  //       }
-  //     );
-  //     stop(runner);
-  //     expect(onStop).toBeCalledTimes(1);
-  //   });
+  //调用stop 触发onStop函数
+  it("onStop", () => {
+    const obj = reactive({
+      foo: 1,
+    });
+    const onStop = jest.fn();
+    let dummy;
+    const runner = effect(
+      () => {
+        dummy = obj.foo;
+      },
+      {
+        onStop,
+      }
+    );
+    stop(runner);
+    expect(onStop).toBeCalledTimes(1);
+  });
 });

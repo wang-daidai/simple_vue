@@ -1,16 +1,29 @@
 export class ReactiveEffect {
   private _fn: () => void;
-  constructor(fn: () => void) {
+  public deps: any[] = [];
+  onStop?: () => void;
+
+  constructor(fn: () => void, public scheduler?: any) {
     this._fn = fn;
   }
 
   run() {
     activeEffect = this;
-    return this._fn();
+    const result = this._fn();
+    //将activeEffect置为null,防止多次收集
+    activeEffect = null;
+    return result;
+  }
+  stop() {
+    if (this.onStop) this.onStop();
+    this.deps.forEach((dep: any) => {
+      dep.delete(this);
+    });
   }
 }
 let targetsMap = new Map();
 export function track(target: any, key: string) {
+  if (!activeEffect) return;
   let targetMap = targetsMap.get(key);
   if (!targetMap) {
     targetMap = new Map();
@@ -22,20 +35,31 @@ export function track(target: any, key: string) {
     targetMap.set(key, deps);
   }
   deps.add(activeEffect);
+  activeEffect.deps.push(deps);
 }
 
 export function trigger(target: any, key: string) {
   let targetMap = targetsMap.get(target);
   let deps = targetMap.get(key);
   for (const effect of deps) {
-    effect.run();
+    if (effect.scheduler) {
+      effect.scheduler();
+    } else {
+      effect.run();
+    }
   }
+}
+
+export function stop(runner: any) {
+  runner._effect.stop();
 }
 
 let activeEffect: any = null;
 export function effect(fn: () => void, options: any = {}) {
-  const _effect = new ReactiveEffect(fn);
+  const _effect = new ReactiveEffect(fn, options.scheduler);
+  Object.assign(_effect, options);
   _effect.run();
-  const runner = _effect.run.bind(_effect);
+  const runner = _effect.run.bind(_effect) as any;
+  runner._effect = _effect;
   return runner;
 }
