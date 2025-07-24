@@ -39,6 +39,29 @@ export function readonly(target: any) {
       }
       return res;
     },
+    //readonly 不能set修改值
+    set(target: any, key: string) {
+      console.warn(`该对象为readonly类型，${key} 不能被修改`);
+      return false;
+    },
+  });
+}
+
+export function shallowReadonly(target: any) {
+  return new Proxy(target, {
+    get(target, key: string) {
+      if (key === ReactiveFlags.IS_READONLY) {
+        return true;
+      }
+      const res = Reflect.get(target, key);
+      //收集
+      track(target, key);
+      if (isObject(res)) {
+        return reactive(res);
+      }
+      return res;
+    },
+    //readonly 不能set修改值
     set(target: any, key: string) {
       console.warn(`该对象为readonly类型，${key} 不能被修改`);
       return false;
@@ -55,4 +78,6 @@ export function isReadonly(raw: any) {
   return !!raw[ReactiveFlags.IS_READONLY];
 }
 
-export function toRaw(raw: any) {}
+export function isProxy(raw: any) {
+  return isReactive(raw) || isReadonly(raw);
+}
