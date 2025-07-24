@@ -1,0 +1,46 @@
+import { isObject } from "../shared";
+
+//创建组件实例
+export function createComponentInstance(vnode: any) {
+  const component = {
+    vnode,
+    type: vnode.type,
+    setupState: {},
+  };
+  return component;
+}
+
+//组件初始化
+export function setupComponent(instance: any) {
+  //初始化props
+  //  initProps(instance);
+  //初始化slots
+  //   initSlots(instance);
+  //处理有状态的组件
+  setupStatefulComponent(instance);
+}
+
+function setupStatefulComponent(instance: any) {
+  const Component = instance.type;
+
+  const { setup } = Component;
+  if (setup) {
+    const setupResult = setup();
+
+    handleSetupResult(instance, setupResult);
+  }
+}
+
+function handleSetupResult(instance: any, setupResult: any) {
+  //组件setup函数会对象或函数，返回函数即可看成h函数
+  if (isObject(setupResult)) {
+    instance.setupState = setupResult;
+    finishComponentSetup(instance);
+  }
+}
+function finishComponentSetup(instance: any) {
+  const Component = instance.type;
+  if (Component.render) {
+    instance.render = Component.render;
+  }
+}
