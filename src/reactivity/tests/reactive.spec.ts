@@ -1,14 +1,19 @@
-import { reactive, isReactive, toRaw } from "../reactive";
+import { reactive, readonly, isReactive, isReadonly, toRaw } from "../reactive";
 
 describe("reactive", () => {
   it("happy path", () => {
-    const original = { foo: 1 };
+    const original = { foo: 1, bar: { baz: 2 } };
     const observed = reactive(original);
+    const readonlyObj = readonly(original);
     expect(observed).not.toBe(original);
-    expect(isReactive(observed)).toBe(true);
-    expect(isReactive(original)).toBe(false);
     expect(observed.foo).toBe(1);
-    expect("foo" in observed).toBe(true);
+    expect(isReactive(original)).toBe(false);
+    expect(isReactive(readonlyObj)).toBe(false);
+    expect(isReactive(observed)).toBe(true);
+    expect(isReadonly(readonlyObj)).toBe(true);
+    expect(isReadonly(readonlyObj.bar)).toBe(true);
+    expect(isReadonly(observed)).toBe(false);
+    expect(isReadonly(readonlyObj.bar)).toBe(true);
   });
 
   it("nested reactive", () => {
