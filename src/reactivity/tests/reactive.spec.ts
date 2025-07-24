@@ -5,6 +5,7 @@ describe("reactive", () => {
     const original = { foo: 1, bar: { baz: 2 } };
     const observed = reactive(original);
     const readonlyObj = readonly(original);
+
     expect(observed).not.toBe(original);
     expect(observed.foo).toBe(1);
     expect(isReactive(original)).toBe(false);
