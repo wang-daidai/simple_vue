@@ -12,6 +12,23 @@ function h(type, props, children) {
 }
 
 const isObject = (raw) => raw !== null && typeof raw === "object";
+const hasOwn = (raw, key) => Object.prototype.hasOwnProperty.call(raw, key);
+
+const publicPropertiesMap = {
+    $el: (i) => i.vnode.el,
+};
+const PublicInstanceProxyHandlers = {
+    get({ _: instance }, key) {
+        const { setupState } = instance;
+        if (hasOwn(setupState, key)) {
+            return setupState[key];
+        }
+        const publicGetter = publicPropertiesMap[key];
+        if (publicGetter) {
+            return publicGetter(instance);
+        }
+    },
+};
 
 //创建组件实例
 function createComponentInstance(vnode) {
@@ -19,6 +36,7 @@ function createComponentInstance(vnode) {
         vnode,
         type: vnode.type,
         setupState: {},
+        proxy: null,
     };
     return component;
 }
@@ -33,6 +51,16 @@ function setupComponent(instance) {
 }
 function setupStatefulComponent(instance) {
     const Component = instance.type;
+    instance.proxy = new Proxy({ _: instance }, PublicInstanceProxyHandlers
+    // {
+    //   get(instance, key: string) {
+    //     const { setupState } = instance;
+    //     if (hasOwn(setupState, key)) {
+    //       return setupState[key];
+    //     }
+    //   },
+    // }
+    );
     const { setup } = Component;
     if (setup) {
         const setupResult = setup();
@@ -40,7 +68,7 @@ function setupStatefulComponent(instance) {
     }
 }
 function handleSetupResult(instance, setupResult) {
-    //组件setup函数会对象或函数，返回函数即可看成h函数
+    //组件setup函数可能为对象或函数，返回函数即可看成h函数
     if (isObject(setupResult)) {
         instance.setupState = setupResult;
         finishComponentSetup(instance);
@@ -82,15 +110,18 @@ function mountComponent(vnode, container) {
     setupRenderEffect(instance, vnode, container);
 }
 function setupRenderEffect(instance, vnode, container) {
-    const subTree = instance.render();
+    const { proxy } = instance;
+    const subTree = instance.render.call(proxy);
     //subTree 为组件对应的vnode
     //组件转换完毕后，再次patch vnode=>element
     path(subTree, container);
+    //等element挂载完毕后，再赋值el
+    vnode.el = subTree.el;
 }
 //挂载element
 function mountElement(vnode, container) {
     const { type, props, children } = vnode;
-    const el = document.createElement(type);
+    const el = (vnode.el = document.createElement(type));
     el.textContent = children;
     for (const key in props) {
         const val = props[key];

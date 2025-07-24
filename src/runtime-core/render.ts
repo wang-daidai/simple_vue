@@ -33,11 +33,15 @@ function mountComponent(vnode: any, container: any) {
 }
 
 function setupRenderEffect(instance: any, vnode: any, container: any) {
-  const subTree = instance.render();
+  const { proxy } = instance;
+  const subTree = instance.render.call(proxy);
   //subTree 为组件对应的vnode
   //组件转换完毕后，再次patch vnode=>element
 
   path(subTree, container);
+
+  //等element挂载完毕后，再赋值el
+  vnode.el = subTree.el;
 }
 
 //TODO更新组件
@@ -46,7 +50,7 @@ function updateComponent(vnode: any, container: any) {}
 //挂载element
 function mountElement(vnode: any, container: any) {
   const { type, props, children } = vnode;
-  const el = document.createElement(type);
+  const el = (vnode.el = document.createElement(type));
 
   el.textContent = children;
   for (const key in props) {

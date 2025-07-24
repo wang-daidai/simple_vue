@@ -1,11 +1,12 @@
-import { isObject } from "../shared";
-
+import { isObject, hasOwn } from "../shared";
+import { PublicInstanceProxyHandlers } from "./componentPublicInstance";
 //创建组件实例
 export function createComponentInstance(vnode: any) {
   const component = {
     vnode,
     type: vnode.type,
     setupState: {},
+    proxy: null,
   };
   return component;
 }
@@ -22,6 +23,18 @@ export function setupComponent(instance: any) {
 
 function setupStatefulComponent(instance: any) {
   const Component = instance.type;
+  instance.proxy = new Proxy(
+    { _: instance },
+    PublicInstanceProxyHandlers
+    // {
+    //   get(instance, key: string) {
+    //     const { setupState } = instance;
+    //     if (hasOwn(setupState, key)) {
+    //       return setupState[key];
+    //     }
+    //   },
+    // }
+  );
 
   const { setup } = Component;
   if (setup) {
@@ -32,7 +45,7 @@ function setupStatefulComponent(instance: any) {
 }
 
 function handleSetupResult(instance: any, setupResult: any) {
-  //组件setup函数会对象或函数，返回函数即可看成h函数
+  //组件setup函数可能为对象或函数，返回函数即可看成h函数
   if (isObject(setupResult)) {
     instance.setupState = setupResult;
     finishComponentSetup(instance);
