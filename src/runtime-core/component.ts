@@ -1,5 +1,6 @@
 import { shallowReadonly } from "@/reactivity/reactive";
-import { isObject, hasOwn } from "../shared";
+import { isObject } from "../shared";
+import { emitEvent } from "./emit";
 import { PublicInstanceProxyHandlers } from "./componentPublicInstance";
 //创建组件实例
 export function createComponentInstance(vnode: any) {
@@ -10,7 +11,12 @@ export function createComponentInstance(vnode: any) {
     proxy: null,
     render: null,
     props: {},
+    emit: () => {},
   };
+  //通过bind为emitEvent这一函数传入第一个参数component
+  //后续接受用户传入的事件名和其他载荷
+  component.emit = emitEvent.bind(null, component);
+
   return component;
 }
 
@@ -32,7 +38,9 @@ function setupStatefulComponent(instance: any) {
 
   const { setup } = Component;
   if (setup) {
-    const setupResult = setup(shallowReadonly(instance.props));
+    const setupResult = setup(shallowReadonly(instance.props), {
+      emit: instance.emit,
+    });
 
     handleSetupResult(instance, setupResult);
   }

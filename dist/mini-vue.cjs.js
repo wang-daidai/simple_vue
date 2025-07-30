@@ -6,6 +6,21 @@ const isObject = (raw) => raw !== null && typeof raw === "object";
 const hasOwn = (raw, key) => Object.prototype.hasOwnProperty.call(raw, key);
 //注册事件用 onClick
 const isOn = (key) => /^on[A-Z]/.test(key);
+//add-foo -> addFoo
+function camelize(str) {
+    //c 是 - 后面第一个字符
+    return str.replace(/-(\w)/g, (_, c) => {
+        return c ? c.toUpperCase() : "";
+    });
+}
+//add->Add
+function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+//add -> onAdd
+function toHandlerKey(str) {
+    return str ? "on" + capitalize(camelize(str)) : "";
+}
 
 function createVNode(type, props, children) {
     const vnode = {
@@ -114,6 +129,17 @@ function shallowReadonly(target) {
     return new Proxy(target, shallowReadonlyHandler);
 }
 
+//父组件将emit函数传给子组件
+//子组件触发这一函数，父组件根据emit中第一个参数事件名称
+//去查找是否有这一事件注册，这里涉及到一些命名规范转化
+//若有注册方法，则调用该方法，并将一并传入参数
+function emitEvent(instance, eventName, ...args) {
+    const { props } = instance;
+    let handlerName = toHandlerKey(eventName);
+    const hander = props[handlerName];
+    hander && hander(...args);
+}
+
 const publicPropertiesMap = {
     $el: (i) => i.vnode.el,
 };
@@ -142,7 +168,9 @@ function createComponentInstance(vnode) {
         proxy: null,
         render: null,
         props: {},
+        emit: () => { },
     };
+    component.emit = emitEvent.bind(null, component);
     return component;
 }
 //组件初始化
@@ -162,7 +190,9 @@ function setupStatefulComponent(instance) {
     instance.proxy = new Proxy({ _: instance }, PublicInstanceProxyHandlers);
     const { setup } = Component;
     if (setup) {
-        const setupResult = setup(shallowReadonly(instance.props));
+        const setupResult = setup(shallowReadonly(instance.props), {
+            emit: instance.emit,
+        });
         handleSetupResult(instance, setupResult);
     }
 }

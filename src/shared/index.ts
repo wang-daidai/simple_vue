@@ -9,3 +9,21 @@ export const hasOwn = (raw: any, key: string) => Object.prototype.hasOwnProperty
 
 //注册事件用 onClick
 export const isOn = (key: string) => /^on[A-Z]/.test(key);
+
+//add-foo -> addFoo
+export function camelize(str: string) {
+  //c 是 - 后面第一个字符
+  return str.replace(/-(\w)/g, (_, c: String) => {
+    return c ? c.toUpperCase() : "";
+  });
+}
+
+//add->Add
+export function capitalize(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+//add -> onAdd
+export function toHandlerKey(str: string) {
+  return str ? "on" + capitalize(camelize(str)) : "";
+}
