@@ -36,6 +36,13 @@ function createVNode(type, props, children) {
     else if (Array.isArray(children)) {
         vnode.shapeFlags |= 8 /* ShapeFlags.ARRAY_CHILDREN */;
     }
+    //父组件是否有传入插槽内容
+    //首先要为一个组件vnode，并且children为h函数返回的一个对象
+    if (vnode.shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
+        if (isObject(vnode.children)) {
+            vnode.shapeFlags |= 16 /* ShapeFlags.SLOT_CHILDREN */;
+        }
+    }
     return vnode;
 }
 function getShapeFlage(type) {
@@ -142,6 +149,7 @@ function emitEvent(instance, eventName, ...args) {
 
 const publicPropertiesMap = {
     $el: (i) => i.vnode.el,
+    $slots: (i) => i.slots,
 };
 const PublicInstanceProxyHandlers = {
     get({ _: instance }, key) {
@@ -169,7 +177,10 @@ function createComponentInstance(vnode) {
         render: null,
         props: {},
         emit: () => { },
+        slots: {},
     };
+    //通过bind为emitEvent这一函数传入第一个参数component
+    //后续接受用户传入的事件名和其他载荷
     component.emit = emitEvent.bind(null, component);
     return component;
 }
@@ -178,12 +189,15 @@ function setupComponent(instance) {
     //初始化props
     initProps(instance);
     //初始化slots
-    //   initSlots(instance);
+    initSlots(instance);
     //处理有状态的组件
     setupStatefulComponent(instance);
 }
 function initProps(instance) {
     instance.props = instance.vnode.props || {};
+}
+function initSlots(instance) {
+    instance.slots = Array.isArray(instance.vnode.children) ? instance.vnode.children : [instance.vnode.children];
 }
 function setupStatefulComponent(instance) {
     const Component = instance.type;
@@ -288,5 +302,10 @@ function createApp(rootComponent) {
     };
 }
 
+function renderSlots(slots) {
+    return h("div", {}, slots);
+}
+
 exports.createApp = createApp;
 exports.h = h;
+exports.renderSlots = renderSlots;

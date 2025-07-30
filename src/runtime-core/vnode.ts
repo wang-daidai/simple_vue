@@ -13,7 +13,13 @@ export function createVNode(type: any, props?: any, children?: any[]) {
   } else if (Array.isArray(children)) {
     vnode.shapeFlags |= ShapeFlags.ARRAY_CHILDREN;
   }
-
+  //父组件是否有传入插槽内容
+  //首先要为一个组件vnode，并且children为h函数返回的一个对象
+  if (vnode.shapeFlags & ShapeFlags.STATEFUL_COMPONENT) {
+    if (isObject(vnode.children)) {
+      vnode.shapeFlags |= ShapeFlags.SLOT_CHILDREN;
+    }
+  }
   return vnode;
 }
 

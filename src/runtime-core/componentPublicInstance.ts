@@ -1,6 +1,7 @@
 import { hasOwn } from "../shared";
 const publicPropertiesMap = {
   $el: (i: any) => i.vnode.el,
+  $slots: (i: any) => i.slots,
 };
 
 export const PublicInstanceProxyHandlers = {

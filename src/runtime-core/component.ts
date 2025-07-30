@@ -12,6 +12,7 @@ export function createComponentInstance(vnode: any) {
     render: null,
     props: {},
     emit: () => {},
+    slots: {},
   };
   //通过bind为emitEvent这一函数传入第一个参数component
   //后续接受用户传入的事件名和其他载荷
@@ -25,12 +26,16 @@ export function setupComponent(instance: any) {
   //初始化props
   initProps(instance);
   //初始化slots
-  //   initSlots(instance);
+  initSlots(instance);
   //处理有状态的组件
   setupStatefulComponent(instance);
 }
 function initProps(instance) {
   instance.props = instance.vnode.props || {};
+}
+function initSlots(instance) {
+  const children = instance.vnode.children;
+  instance.slots = Array.isArray(children) ? children : [children];
 }
 function setupStatefulComponent(instance: any) {
   const Component = instance.type;
