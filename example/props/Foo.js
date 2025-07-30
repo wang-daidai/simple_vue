@@ -4,7 +4,9 @@ export const Foo = {
   render() {
     return h("div", {}, "foo:" + this.count);
   },
-  setup() {
+  setup(props) {
+    console.log(props, "props");
+    props.count++;
     return {};
   },
 };

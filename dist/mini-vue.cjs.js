@@ -38,6 +38,82 @@ function h(type, props, children) {
     return createVNode(type, props, children);
 }
 
+let targetsMap = new Map();
+function trigger(target, key) {
+    let targetMap = targetsMap.get(target);
+    let deps = targetMap.get(key);
+    triggerEffect(deps);
+}
+function triggerEffect(deps) {
+    for (const effect of deps) {
+        if (effect.scheduler) {
+            effect.scheduler();
+        }
+        else {
+            effect.run();
+        }
+    }
+}
+
+//提前调用函数，之后就用引用的对象
+const reactiveGet = createGetter();
+const readonlyGet = createGetter(true, false);
+//shallowReadonlyGet  只追踪顶层属性的访问,直接修改顶层属性会被阻止,内部嵌套属性为普通对象
+const shallowReadonlyGet = createGetter(true, true);
+const reactiveSet = createSetter();
+const readonlySet = createReadonlySetter();
+function createGetter(isReadonly = false, isshallowReadonly = false) {
+    return function (target, key) {
+        if (key === "_isReactive" /* ReactiveFlags.IS_REACTIVE */) {
+            return !isReadonly;
+        }
+        if (key === "_isReadonly" /* ReactiveFlags.IS_READONLY */) {
+            return isReadonly;
+        }
+        const res = Reflect.get(target, key);
+        if (isObject(res) && !isshallowReadonly) {
+            return isReadonly ? readonly(res) : reactive(res);
+        }
+        return res;
+    };
+}
+function createSetter() {
+    return function (target, key, value) {
+        const res = Reflect.set(target, key, value);
+        trigger(target, key);
+        return res;
+    };
+}
+function createReadonlySetter() {
+    return function (target, key) {
+        console.warn(`该对象为readonly类型，${key} 不能被修改`);
+        //return false 会抛出错误
+        return true;
+    };
+}
+const reactiveHandler = {
+    get: reactiveGet,
+    set: reactiveSet,
+};
+const readonlyHandler = {
+    get: readonlyGet,
+    set: readonlySet,
+};
+const shallowReadonlyHandler = {
+    get: shallowReadonlyGet,
+    set: readonlySet,
+};
+
+function reactive(target) {
+    return new Proxy(target, reactiveHandler);
+}
+function readonly(target) {
+    return new Proxy(target, readonlyHandler);
+}
+function shallowReadonly(target) {
+    return new Proxy(target, shallowReadonlyHandler);
+}
+
 const publicPropertiesMap = {
     $el: (i) => i.vnode.el,
 };
@@ -86,7 +162,7 @@ function setupStatefulComponent(instance) {
     instance.proxy = new Proxy({ _: instance }, PublicInstanceProxyHandlers);
     const { setup } = Component;
     if (setup) {
-        const setupResult = setup();
+        const setupResult = setup(shallowReadonly(instance.props));
         handleSetupResult(instance, setupResult);
     }
 }

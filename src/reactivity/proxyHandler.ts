@@ -43,7 +43,8 @@ function createSetter() {
 function createReadonlySetter() {
   return function (target: any, key: string) {
     console.warn(`该对象为readonly类型，${key} 不能被修改`);
-    return false;
+    //return false 会抛出错误
+    return true;
   };
 }
 

@@ -1,3 +1,4 @@
+import { shallowReadonly } from "@/reactivity/reactive";
 import { isObject, hasOwn } from "../shared";
 import { PublicInstanceProxyHandlers } from "./componentPublicInstance";
 //创建组件实例
@@ -31,7 +32,7 @@ function setupStatefulComponent(instance: any) {
 
   const { setup } = Component;
   if (setup) {
-    const setupResult = setup();
+    const setupResult = setup(shallowReadonly(instance.props));
 
     handleSetupResult(instance, setupResult);
   }
