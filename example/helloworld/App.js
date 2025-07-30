@@ -3,7 +3,6 @@ export const App = {
   name: "App",
   render() {
     window.self = this;
-
     return h(
       "div",
       {

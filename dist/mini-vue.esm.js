@@ -1,18 +1,29 @@
+const isObject = (raw) => raw !== null && typeof raw === "object";
+const hasOwn = (raw, key) => Object.prototype.hasOwnProperty.call(raw, key);
+
 function createVNode(type, props, children) {
     const vnode = {
         type,
         props,
         children,
+        shapeFlags: getShapeFlage(type),
     };
     return vnode;
+}
+function getShapeFlage(type) {
+    if (typeof type == "string") {
+        //'div' 'span'
+        return 1 /* ShapeFlags.ElEMENT */;
+    }
+    else if (isObject(type)) {
+        //{name:"",render(){},setup(){}}
+        return 2 /* ShapeFlags.STATEFUL_COMPONENT */;
+    }
 }
 
 function h(type, props, children) {
     return createVNode(type, props, children);
 }
-
-const isObject = (raw) => raw !== null && typeof raw === "object";
-const hasOwn = (raw, key) => Object.prototype.hasOwnProperty.call(raw, key);
 
 const publicPropertiesMap = {
     $el: (i) => i.vnode.el,
@@ -37,6 +48,7 @@ function createComponentInstance(vnode) {
         type: vnode.type,
         setupState: {},
         proxy: null,
+        render: null,
     };
     return component;
 }
@@ -51,16 +63,7 @@ function setupComponent(instance) {
 }
 function setupStatefulComponent(instance) {
     const Component = instance.type;
-    instance.proxy = new Proxy({ _: instance }, PublicInstanceProxyHandlers
-    // {
-    //   get(instance, key: string) {
-    //     const { setupState } = instance;
-    //     if (hasOwn(setupState, key)) {
-    //       return setupState[key];
-    //     }
-    //   },
-    // }
-    );
+    instance.proxy = new Proxy({ _: instance }, PublicInstanceProxyHandlers);
     const { setup } = Component;
     if (setup) {
         const setupResult = setup();
@@ -85,14 +88,14 @@ function render(vnode, container) {
     path(vnode, container);
 }
 function path(vnode, container) {
-    const { type } = vnode;
-    if (isObject(type)) {
-        //处理组件
-        processComponent(vnode, container);
-    }
-    else {
+    const { shapeFlags } = vnode;
+    if (shapeFlags & 1 /* ShapeFlags.ElEMENT */) {
         //处理element
         processElement(vnode, container);
+    }
+    else if (shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
+        //处理组件
+        processComponent(vnode, container);
     }
 }
 function processComponent(vnode, container) {
@@ -104,19 +107,19 @@ function processElement(vnode, container) {
     //TODO update
 }
 //挂载组件
-function mountComponent(vnode, container) {
-    const instance = createComponentInstance(vnode);
+function mountComponent(initinalVnode, container) {
+    const instance = createComponentInstance(initinalVnode);
     setupComponent(instance);
-    setupRenderEffect(instance, vnode, container);
+    setupRenderEffect(instance, initinalVnode, container);
 }
-function setupRenderEffect(instance, vnode, container) {
+function setupRenderEffect(instance, initinalVnode, container) {
     const { proxy } = instance;
     const subTree = instance.render.call(proxy);
     //subTree 为组件对应的vnode
     //组件转换完毕后，再次patch vnode=>element
     path(subTree, container);
     //等element挂载完毕后，再赋值el
-    vnode.el = subTree.el;
+    initinalVnode.el = subTree.el;
 }
 //挂载element
 function mountElement(vnode, container) {
