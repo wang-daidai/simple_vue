@@ -1,5 +1,6 @@
 import { ShapeFlags } from "@/shared/shapeFlags";
 import { createComponentInstance, setupComponent } from "./component";
+import { isOn } from "../shared";
 export function render(vnode: any, container: any) {
   path(vnode, container);
 }
@@ -59,7 +60,12 @@ function mountElement(vnode: any, container: any) {
   }
   for (const key in props) {
     const val = props[key];
-    el.setAttribute(key, val);
+    if (isOn(key)) {
+      const event = key.slice(2).toLowerCase();
+      el.addEventListener(event, val);
+    } else {
+      el.setAttribute(key, val);
+    }
   }
   container.append(el);
 }

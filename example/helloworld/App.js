@@ -8,6 +8,9 @@ export const App = {
       {
         id: "app",
         class: ["red", "hard"],
+        onClick() {
+          console.log("点击了");
+        },
       },
       //   "hi,mini-vue"
       "hi," + this.msg

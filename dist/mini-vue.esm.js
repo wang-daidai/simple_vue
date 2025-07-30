@@ -1,5 +1,9 @@
+//是否为对象
 const isObject = (raw) => raw !== null && typeof raw === "object";
+//是否有属性值
 const hasOwn = (raw, key) => Object.prototype.hasOwnProperty.call(raw, key);
+//注册事件用 onClick
+const isOn = (key) => /^on[A-Z]/.test(key);
 
 function createVNode(type, props, children) {
     const vnode = {
@@ -8,6 +12,13 @@ function createVNode(type, props, children) {
         children,
         shapeFlags: getShapeFlage(type),
     };
+    if (typeof children === "string") {
+        //位运算通过|来赋值
+        vnode.shapeFlags |= 4 /* ShapeFlags.TEXT_CHILDREN */;
+    }
+    else if (Array.isArray(children)) {
+        vnode.shapeFlags |= 8 /* ShapeFlags.ARRAY_CHILDREN */;
+    }
     return vnode;
 }
 function getShapeFlage(type) {
@@ -123,14 +134,32 @@ function setupRenderEffect(instance, initinalVnode, container) {
 }
 //挂载element
 function mountElement(vnode, container) {
-    const { type, props, children } = vnode;
+    const { type, props, children, shapeFlags } = vnode;
     const el = (vnode.el = document.createElement(type));
-    el.textContent = children;
+    if (shapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
+        el.textContent = children;
+    }
+    else if (shapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
+        mountChild(vnode, el);
+    }
     for (const key in props) {
         const val = props[key];
-        el.setAttribute(key, val);
+        if (isOn(key)) {
+            const event = key.slice(2).toLowerCase();
+            el.addEventListener(event, val);
+        }
+        else {
+            el.setAttribute(key, val);
+        }
     }
     container.append(el);
+}
+//挂载子组件
+function mountChild(vnode, el) {
+    const { chilidren } = vnode;
+    for (const child of chilidren) {
+        path(child, el);
+    }
 }
 
 function createApp(rootComponent) {
