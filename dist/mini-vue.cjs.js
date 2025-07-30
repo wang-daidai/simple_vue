@@ -43,9 +43,12 @@ const publicPropertiesMap = {
 };
 const PublicInstanceProxyHandlers = {
     get({ _: instance }, key) {
-        const { setupState } = instance;
+        const { setupState, props } = instance;
         if (hasOwn(setupState, key)) {
             return setupState[key];
+        }
+        if (hasOwn(props, key)) {
+            return props[key];
         }
         const publicGetter = publicPropertiesMap[key];
         if (publicGetter) {
@@ -62,17 +65,21 @@ function createComponentInstance(vnode) {
         setupState: {},
         proxy: null,
         render: null,
+        props: {},
     };
     return component;
 }
 //组件初始化
 function setupComponent(instance) {
     //初始化props
-    //  initProps(instance);
+    initProps(instance);
     //初始化slots
     //   initSlots(instance);
     //处理有状态的组件
     setupStatefulComponent(instance);
+}
+function initProps(instance) {
+    instance.props = instance.vnode.props || {};
 }
 function setupStatefulComponent(instance) {
     const Component = instance.type;
@@ -158,8 +165,8 @@ function mountElement(vnode, container) {
 }
 //挂载子组件
 function mountChild(vnode, el) {
-    const { chilidren } = vnode;
-    for (const child of chilidren) {
+    const { children } = vnode;
+    for (const child of children) {
         path(child, el);
     }
 }

@@ -72,8 +72,8 @@ function mountElement(vnode: any, container: any) {
 
 //挂载子组件
 function mountChild(vnode: any, el: any) {
-  const { chilidren } = vnode;
-  for (const child of chilidren) {
+  const { children } = vnode;
+  for (const child of children) {
     path(child, el);
   }
 }

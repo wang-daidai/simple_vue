@@ -8,6 +8,7 @@ export function createComponentInstance(vnode: any) {
     setupState: {},
     proxy: null,
     render: null,
+    props: {},
   };
   return component;
 }
@@ -15,13 +16,15 @@ export function createComponentInstance(vnode: any) {
 //组件初始化
 export function setupComponent(instance: any) {
   //初始化props
-  //  initProps(instance);
+  initProps(instance);
   //初始化slots
   //   initSlots(instance);
   //处理有状态的组件
   setupStatefulComponent(instance);
 }
-
+function initProps(instance) {
+  instance.props = instance.vnode.props || {};
+}
 function setupStatefulComponent(instance: any) {
   const Component = instance.type;
   instance.proxy = new Proxy({ _: instance }, PublicInstanceProxyHandlers);
