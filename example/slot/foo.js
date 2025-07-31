@@ -12,16 +12,15 @@ export const Foo = {
     // return h("div", {}, [foo, this.$slots]);
 
     console.log(this.$slots, "$slots");
-    console.log(renderSlots(this.$slots), "renderSlots");
 
     //2.传入数组后，this.$slots为一个数组，需要用h进行包裹处理
+    //因为实现具名插槽时把this.$slots 改为了对象，所以默认使用时就渲染不出来了
     // return h("div", {}, [foo, h("div", {}, this.$slots)]);
-
-    //用renderSlots 封装插槽
-    // return h("div", {}, [renderSlots(this.$slots, "header"), foo, renderSlots(this.$slots, "footer")]);
 
     //3.具名插槽 实现步骤
     //1.获取要渲染的元素
     //2.获取渲染的位置
+    //用renderSlots 封装插槽
+    return h("div", {}, [renderSlots(this.$slots, "header"), foo, renderSlots(this.$slots, "footer")]);
   },
 };

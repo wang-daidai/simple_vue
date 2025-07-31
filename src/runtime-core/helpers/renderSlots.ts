@@ -1,4 +1,6 @@
 import { h } from "../h";
-export function renderSlots(slots, key) {
-  return h("div", {}, slots);
+export function renderSlots(slots, slotName) {
+  if (slots[slotName]) {
+    return h("div", {}, slots[slotName]);
+  }
 }

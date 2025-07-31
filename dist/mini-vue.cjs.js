@@ -167,6 +167,16 @@ const PublicInstanceProxyHandlers = {
     },
 };
 
+function initSlots(instance) {
+    const { children, shapeFlags } = instance.vnode;
+    if (shapeFlags & 16 /* ShapeFlags.SLOT_CHILDREN */) {
+        for (const key in children) {
+            const value = children[key];
+            instance.slots[key] = Array.isArray(value) ? value : [value];
+        }
+    }
+}
+
 //创建组件实例
 function createComponentInstance(vnode) {
     const component = {
@@ -195,9 +205,6 @@ function setupComponent(instance) {
 }
 function initProps(instance) {
     instance.props = instance.vnode.props || {};
-}
-function initSlots(instance) {
-    instance.slots = Array.isArray(instance.vnode.children) ? instance.vnode.children : [instance.vnode.children];
 }
 function setupStatefulComponent(instance) {
     const Component = instance.type;
@@ -302,8 +309,10 @@ function createApp(rootComponent) {
     };
 }
 
-function renderSlots(slots) {
-    return h("div", {}, slots);
+function renderSlots(slots, slotName) {
+    if (slots[slotName]) {
+        return h("div", {}, slots[slotName]);
+    }
 }
 
 exports.createApp = createApp;

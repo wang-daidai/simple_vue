@@ -2,6 +2,8 @@ import { shallowReadonly } from "@/reactivity/reactive";
 import { isObject } from "../shared";
 import { emitEvent } from "./emit";
 import { PublicInstanceProxyHandlers } from "./componentPublicInstance";
+import { initSlots } from "./componentSlots";
+import { initProps } from "./componentProps";
 //创建组件实例
 export function createComponentInstance(vnode: any) {
   const component = {
@@ -30,13 +32,7 @@ export function setupComponent(instance: any) {
   //处理有状态的组件
   setupStatefulComponent(instance);
 }
-function initProps(instance) {
-  instance.props = instance.vnode.props || {};
-}
-function initSlots(instance) {
-  const children = instance.vnode.children;
-  instance.slots = Array.isArray(children) ? children : [children];
-}
+
 function setupStatefulComponent(instance: any) {
   const Component = instance.type;
   instance.proxy = new Proxy({ _: instance }, PublicInstanceProxyHandlers);
