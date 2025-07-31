@@ -192,7 +192,7 @@ function initProps(instance) {
 }
 
 //创建组件实例
-function createComponentInstance(vnode) {
+function createComponentInstance(vnode, parentComponent) {
     const component = {
         vnode,
         type: vnode.type,
@@ -202,6 +202,7 @@ function createComponentInstance(vnode) {
         props: {},
         emit: () => { },
         slots: {},
+        provider: parentComponent ? parentComponent.provider : {},
     };
     //通过bind为emitEvent这一函数传入第一个参数component
     //后续接受用户传入的事件名和其他载荷
@@ -234,8 +235,8 @@ function handleSetupResult(instance, setupResult) {
     //组件setup函数可能为对象或函数，返回函数即可看成h函数
     if (isObject(setupResult)) {
         instance.setupState = setupResult;
-        finishComponentSetup(instance);
     }
+    finishComponentSetup(instance);
 }
 function finishComponentSetup(instance) {
     const Component = instance.type;
@@ -252,15 +253,15 @@ function setCurrentInstance(instance) {
 }
 
 function render(vnode, container) {
-    path(vnode, container);
+    path(vnode, container, null);
 }
-function path(vnode, container) {
+function path(vnode, container, parentComponent) {
     const { shapeFlags, type } = vnode;
     //区分vnode中的type
     switch (type) {
         case Fragment:
             //Fragment -> 只渲染 children
-            processFragment(vnode, container);
+            processFragment(vnode, container, parentComponent);
             break;
         case Text:
             processText(vnode, container);
@@ -268,17 +269,17 @@ function path(vnode, container) {
         default:
             if (shapeFlags & 1 /* ShapeFlags.ElEMENT */) {
                 //处理element
-                processElement(vnode, container);
+                processElement(vnode, container, parentComponent);
             }
             else if (shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
                 //处理组件
-                processComponent(vnode, container);
+                processComponent(vnode, container, parentComponent);
             }
     }
 }
 //处理type 为 Fragment 类型的节点 渲染子节点，将渲染后的dom直接放到container下
-function processFragment(vnode, container) {
-    mountChildren(vnode.children, container);
+function processFragment(vnode, container, parentComponent) {
+    mountChildren(vnode.children, container, parentComponent);
 }
 //处理文本节点，通过createTextNode方法，将文本内容直接显示，内容外面没有标签包裹
 function processText(vnode, container) {
@@ -287,18 +288,18 @@ function processText(vnode, container) {
     container.append(textNode);
 }
 //处理组件
-function processComponent(vnode, container) {
-    mountComponent(vnode, container);
+function processComponent(vnode, container, parentComponent) {
+    mountComponent(vnode, container, parentComponent);
 }
 //处理Element 节点
-function processElement(vnode, container) {
+function processElement(vnode, container, parentComponent) {
     //init
-    mountElement(vnode, container);
+    mountElement(vnode, container, parentComponent);
     //TODO update
 }
 //挂载组件
-function mountComponent(initinalVnode, container) {
-    const instance = createComponentInstance(initinalVnode);
+function mountComponent(initinalVnode, container, parentComponent) {
+    const instance = createComponentInstance(initinalVnode, parentComponent);
     setupComponent(instance);
     setupRenderEffect(instance, initinalVnode, container);
 }
@@ -307,19 +308,19 @@ function setupRenderEffect(instance, initinalVnode, container) {
     const subTree = instance.render.call(proxy);
     //subTree 为组件对应的vnode
     //组件转换完毕后，再次patch vnode=>element
-    path(subTree, container);
+    path(subTree, container, instance);
     //等element挂载完毕后，再赋值el
     initinalVnode.el = subTree.el;
 }
 //挂载element
-function mountElement(vnode, container) {
+function mountElement(vnode, container, parentComponent) {
     const { type, props, children, shapeFlags } = vnode;
     const el = (vnode.el = document.createElement(type));
     if (shapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
         el.textContent = children;
     }
     else if (shapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
-        mountChildren(vnode.children, el);
+        mountChildren(vnode.children, el, parentComponent);
     }
     for (const key in props) {
         const val = props[key];
@@ -334,9 +335,9 @@ function mountElement(vnode, container) {
     container.append(el);
 }
 //挂载子组件
-function mountChildren(vnodes, el) {
+function mountChildren(vnodes, el, parentComponent) {
     for (const child of vnodes) {
-        path(child, el);
+        path(child, el, parentComponent);
     }
 }
 
@@ -357,4 +358,18 @@ function renderSlots(slots, slotName, props) {
     }
 }
 
-export { createApp, createTextVNode, getCurrentInstance, h, renderSlots };
+//存
+function provide(key, value) {
+    const { provider } = getCurrentInstance();
+    provider[key] = value;
+}
+//取
+function inject(key, defaultValue) {
+    const { provider } = getCurrentInstance();
+    console.log(provider, "取的时候获取的实例对象");
+    if (provider[key]) {
+        return provider[key];
+    }
+}
+
+export { createApp, createTextVNode, getCurrentInstance, h, inject, provide, renderSlots };

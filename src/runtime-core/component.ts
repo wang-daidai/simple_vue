@@ -5,7 +5,7 @@ import { PublicInstanceProxyHandlers } from "./componentPublicInstance";
 import { initSlots } from "./componentSlots";
 import { initProps } from "./componentProps";
 //创建组件实例
-export function createComponentInstance(vnode: any) {
+export function createComponentInstance(vnode: any, parentComponent) {
   const component = {
     vnode,
     type: vnode.type,
@@ -15,6 +15,7 @@ export function createComponentInstance(vnode: any) {
     props: {},
     emit: () => {},
     slots: {},
+    provider: parentComponent ? parentComponent.provider : {},
   };
   //通过bind为emitEvent这一函数传入第一个参数component
   //后续接受用户传入的事件名和其他载荷
@@ -54,8 +55,8 @@ function handleSetupResult(instance: any, setupResult: any) {
   //组件setup函数可能为对象或函数，返回函数即可看成h函数
   if (isObject(setupResult)) {
     instance.setupState = setupResult;
-    finishComponentSetup(instance);
   }
+  finishComponentSetup(instance);
 }
 function finishComponentSetup(instance: any) {
   const Component = instance.type;
