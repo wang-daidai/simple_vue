@@ -21,6 +21,10 @@ export const Foo = {
     //1.获取要渲染的元素
     //2.获取渲染的位置
     //用renderSlots 封装插槽
-    return h("div", {}, [renderSlots(this.$slots, "header"), foo, renderSlots(this.$slots, "footer")]);
+    // return h("div", {}, [renderSlots(this.$slots, "header"), foo, renderSlots(this.$slots, "footer")]);
+
+    //4.作用域插槽 把插槽转为函数，通过函数调用将age传进去
+    const age = 18;
+    return h("div", {}, [renderSlots(this.$slots, "header", { age }), foo, renderSlots(this.$slots, "footer")]);
   },
 };

@@ -11,12 +11,22 @@ export const App = {
     // const foo = h(Foo, {}, [h("p", {}, "插槽内容1"), h("p", {}, "插槽内容2")]);
 
     //3.具名插槽
+    // const foo = h(
+    //   Foo,
+    //   {},
+    //   {
+    //     footer: h("p", {}, "footer"),
+    //     header: h("p", {}, "header"),
+    //   }
+    // );
+
+    //作用域插槽
     const foo = h(
       Foo,
       {},
       {
-        footer: h("p", {}, "footer"),
-        header: h("p", {}, "header"),
+        footer: () => h("p", {}, "footer"),
+        header: ({ age }) => h("p", {}, "header" + age),
       }
     );
 
