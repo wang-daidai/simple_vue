@@ -15,7 +15,8 @@ export function createComponentInstance(vnode: any, parentComponent) {
     props: {},
     emit: () => {},
     slots: {},
-    provider: parentComponent ? parentComponent.provider : {},
+    provides: parentComponent ? parentComponent.provides : {},
+    parent: parentComponent,
   };
   //通过bind为emitEvent这一函数传入第一个参数component
   //后续接受用户传入的事件名和其他载荷

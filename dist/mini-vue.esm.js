@@ -202,7 +202,8 @@ function createComponentInstance(vnode, parentComponent) {
         props: {},
         emit: () => { },
         slots: {},
-        provider: parentComponent ? parentComponent.provider : {},
+        provides: parentComponent ? parentComponent.provides : {},
+        parent: parentComponent,
     };
     //通过bind为emitEvent这一函数传入第一个参数component
     //后续接受用户传入的事件名和其他载荷
@@ -360,15 +361,29 @@ function renderSlots(slots, slotName, props) {
 
 //存
 function provide(key, value) {
-    const { provider } = getCurrentInstance();
-    provider[key] = value;
+    const currentInstance = getCurrentInstance();
+    if (currentInstance) {
+        let { provides, parent } = currentInstance;
+        if (provides === parent.provides) {
+            currentInstance.provides = Object.create(parent.provides);
+        }
+        currentInstance.provides[key] = value;
+    }
 }
 //取
 function inject(key, defaultValue) {
-    const { provider } = getCurrentInstance();
-    console.log(provider, "取的时候获取的实例对象");
-    if (provider[key]) {
-        return provider[key];
+    const currentInstance = getCurrentInstance();
+    if (currentInstance) {
+        const parentProvides = currentInstance.parent.provides;
+        if (typeof defaultValue === "function") {
+            return defaultValue();
+        }
+        else if (key in parentProvides) {
+            return parentProvides[key];
+        }
+        else if (defaultValue) {
+            return defaultValue;
+        }
     }
 }
 
