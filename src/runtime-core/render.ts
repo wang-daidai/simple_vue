@@ -32,14 +32,17 @@ function path(vnode: any, container: any) {
 function processFragment(vnode, container) {
   mountChildren(vnode.children, container);
 }
+//处理文本节点，通过createTextNode方法，将文本内容直接显示，内容外面没有标签包裹
 function processText(vnode, container) {
-  //   const { children } = vnode;
-  //   const textNode = (vnode.el = document.createTextNode(children));
-  //   container.append(textNode);
+  const { children } = vnode;
+  const textNode = (vnode.el = document.createTextNode(children));
+  container.append(textNode);
 }
+//处理组件
 function processComponent(vnode: any, container: any) {
   mountComponent(vnode, container);
 }
+//处理Element 节点
 function processElement(vnode: any, container: any) {
   //init
   mountElement(vnode, container);

@@ -57,6 +57,10 @@ function getShapeFlage(type) {
         return 2 /* ShapeFlags.STATEFUL_COMPONENT */;
     }
 }
+//创建text节点
+function createTextVNode(text) {
+    return createVNode(Text, {}, text);
+}
 
 function h(type, props, children) {
     return createVNode(type, props, children);
@@ -252,6 +256,7 @@ function path(vnode, container) {
             processFragment(vnode, container);
             break;
         case Text:
+            processText(vnode, container);
             break;
         default:
             if (shapeFlags & 1 /* ShapeFlags.ElEMENT */) {
@@ -264,8 +269,14 @@ function path(vnode, container) {
             }
     }
 }
+//处理type 为 Fragment 类型的节点 渲染子节点，将渲染后的dom直接放到container下
 function processFragment(vnode, container) {
     mountChildren(vnode.children, container);
+}
+function processText(vnode, container) {
+    const { children } = vnode;
+    const textNode = (vnode.el = document.createTextNode(children));
+    container.append(textNode);
 }
 function processComponent(vnode, container) {
     mountComponent(vnode, container);
@@ -337,5 +348,6 @@ function renderSlots(slots, slotName, props) {
 }
 
 exports.createApp = createApp;
+exports.createTextVNode = createTextVNode;
 exports.h = h;
 exports.renderSlots = renderSlots;
