@@ -222,9 +222,11 @@ function setupStatefulComponent(instance) {
     instance.proxy = new Proxy({ _: instance }, PublicInstanceProxyHandlers);
     const { setup } = Component;
     if (setup) {
+        setCurrentInstance(instance);
         const setupResult = setup(shallowReadonly(instance.props), {
             emit: instance.emit,
         });
+        setCurrentInstance(null);
         handleSetupResult(instance, setupResult);
     }
 }
@@ -240,6 +242,13 @@ function finishComponentSetup(instance) {
     if (Component.render) {
         instance.render = Component.render;
     }
+}
+let currentInstance = null;
+function getCurrentInstance() {
+    return currentInstance;
+}
+function setCurrentInstance(instance) {
+    currentInstance = instance;
 }
 
 function render(vnode, container) {
@@ -271,14 +280,17 @@ function path(vnode, container) {
 function processFragment(vnode, container) {
     mountChildren(vnode.children, container);
 }
+//处理文本节点，通过createTextNode方法，将文本内容直接显示，内容外面没有标签包裹
 function processText(vnode, container) {
     const { children } = vnode;
     const textNode = (vnode.el = document.createTextNode(children));
     container.append(textNode);
 }
+//处理组件
 function processComponent(vnode, container) {
     mountComponent(vnode, container);
 }
+//处理Element 节点
 function processElement(vnode, container) {
     //init
     mountElement(vnode, container);
@@ -345,4 +357,4 @@ function renderSlots(slots, slotName, props) {
     }
 }
 
-export { createApp, createTextVNode, h, renderSlots };
+export { createApp, createTextVNode, getCurrentInstance, h, renderSlots };
