@@ -20,6 +20,8 @@ function toHandlerKey(str) {
     return str ? "on" + capitalize(camelize(str)) : "";
 }
 
+const Fragment = Symbol("Fragment");
+const Text = Symbol("Text");
 function createVNode(type, props, children) {
     const vnode = {
         type,
@@ -240,15 +242,28 @@ function render(vnode, container) {
     path(vnode, container);
 }
 function path(vnode, container) {
-    const { shapeFlags } = vnode;
-    if (shapeFlags & 1 /* ShapeFlags.ElEMENT */) {
-        //处理element
-        processElement(vnode, container);
+    const { shapeFlags, type } = vnode;
+    //区分vnode中的type
+    switch (type) {
+        case Fragment:
+            //Fragment -> 只渲染 children
+            processFragment(vnode, container);
+            break;
+        case Text:
+            break;
+        default:
+            if (shapeFlags & 1 /* ShapeFlags.ElEMENT */) {
+                //处理element
+                processElement(vnode, container);
+            }
+            else if (shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
+                //处理组件
+                processComponent(vnode, container);
+            }
     }
-    else if (shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
-        //处理组件
-        processComponent(vnode, container);
-    }
+}
+function processFragment(vnode, container) {
+    mountChildren(vnode.children, container);
 }
 function processComponent(vnode, container) {
     mountComponent(vnode, container);
@@ -281,7 +296,7 @@ function mountElement(vnode, container) {
         el.textContent = children;
     }
     else if (shapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
-        mountChild(vnode, el);
+        mountChildren(vnode.children, el);
     }
     for (const key in props) {
         const val = props[key];
@@ -296,9 +311,8 @@ function mountElement(vnode, container) {
     container.append(el);
 }
 //挂载子组件
-function mountChild(vnode, el) {
-    const { children } = vnode;
-    for (const child of children) {
+function mountChildren(vnodes, el) {
+    for (const child of vnodes) {
         path(child, el);
     }
 }
@@ -316,7 +330,7 @@ function createApp(rootComponent) {
 
 function renderSlots(slots, slotName, props) {
     if (typeof slots[slotName] === "function") {
-        return h("div", {}, slots[slotName](props));
+        return h(Fragment, {}, slots[slotName](props));
     }
 }
 

@@ -1,21 +1,42 @@
 import { ShapeFlags } from "@/shared/shapeFlags";
 import { createComponentInstance, setupComponent } from "./component";
 import { isOn } from "../shared";
+import { Fragment, Text } from "./vnode";
+
 export function render(vnode: any, container: any) {
   path(vnode, container);
 }
 
 function path(vnode: any, container: any) {
-  const { shapeFlags } = vnode;
-  if (shapeFlags & ShapeFlags.ElEMENT) {
-    //处理element
-    processElement(vnode, container);
-  } else if (shapeFlags & ShapeFlags.STATEFUL_COMPONENT) {
-    //处理组件
-    processComponent(vnode, container);
+  const { shapeFlags, type } = vnode;
+  //区分vnode中的type
+  switch (type) {
+    case Fragment:
+      //Fragment -> 只渲染 children
+      processFragment(vnode, container);
+      break;
+    case Text:
+      processText(vnode, container);
+      break;
+    default:
+      if (shapeFlags & ShapeFlags.ElEMENT) {
+        //处理element
+        processElement(vnode, container);
+      } else if (shapeFlags & ShapeFlags.STATEFUL_COMPONENT) {
+        //处理组件
+        processComponent(vnode, container);
+      }
   }
 }
-
+//处理type 为 Fragment 类型的节点 渲染子节点，将渲染后的dom直接放到container下
+function processFragment(vnode, container) {
+  mountChildren(vnode.children, container);
+}
+function processText(vnode, container) {
+  //   const { children } = vnode;
+  //   const textNode = (vnode.el = document.createTextNode(children));
+  //   container.append(textNode);
+}
 function processComponent(vnode: any, container: any) {
   mountComponent(vnode, container);
 }
@@ -56,7 +77,7 @@ function mountElement(vnode: any, container: any) {
   if (shapeFlags & ShapeFlags.TEXT_CHILDREN) {
     el.textContent = children;
   } else if (shapeFlags & ShapeFlags.ARRAY_CHILDREN) {
-    mountChild(vnode, el);
+    mountChildren(vnode.children, el);
   }
   for (const key in props) {
     const val = props[key];
@@ -71,9 +92,8 @@ function mountElement(vnode: any, container: any) {
 }
 
 //挂载子组件
-function mountChild(vnode: any, el: any) {
-  const { children } = vnode;
-  for (const child of children) {
+function mountChildren(vnodes: any, el: any) {
+  for (const child of vnodes) {
     path(child, el);
   }
 }

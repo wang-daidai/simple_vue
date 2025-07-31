@@ -1,6 +1,7 @@
 import { h } from "../h";
+import { Fragment } from "../vnode";
 export function renderSlots(slots, slotName, props?) {
   if (typeof slots[slotName] === "function") {
-    return h("div", {}, slots[slotName](props));
+    return h(Fragment, {}, slots[slotName](props));
   }
 }
