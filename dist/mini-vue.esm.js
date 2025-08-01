@@ -263,7 +263,7 @@ function createAppAPI(render) {
 }
 
 function createRenderer(options) {
-    const { createElement, patchProp, insert } = options;
+    const { createElement: hostCreateElement, patchProp: hostPatchProp, insert: hostInsert } = options;
     function render(vnode, container) {
         path(vnode, container, null);
     }
@@ -327,7 +327,7 @@ function createRenderer(options) {
     //挂载element
     function mountElement(vnode, container, parentComponent) {
         const { type, props, children, shapeFlags } = vnode;
-        const el = (vnode.el = createElement(type));
+        const el = (vnode.el = hostCreateElement(type));
         if (shapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
             el.textContent = children;
         }
@@ -336,9 +336,9 @@ function createRenderer(options) {
         }
         for (const key in props) {
             const val = props[key];
-            patchProp(el, key, val);
+            hostPatchProp(el, key, val);
         }
-        insert(el, container);
+        hostInsert(el, container);
     }
     //挂载子组件
     function mountChildren(vnodes, el, parentComponent) {
@@ -427,4 +427,4 @@ function createApp(rootComponent) {
     return renderer.createApp(rootComponent);
 }
 
-export { createApp, createTextVNode, getCurrentInstance, h, inject, provide, renderSlots };
+export { createApp, createAppAPI, createRenderer, createTextVNode, getCurrentInstance, h, inject, provide, renderSlots };
