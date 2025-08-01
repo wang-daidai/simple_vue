@@ -20,50 +20,6 @@ function toHandlerKey(str) {
     return str ? "on" + capitalize(camelize(str)) : "";
 }
 
-const Fragment = Symbol("Fragment");
-const Text = Symbol("Text");
-function createVNode(type, props, children) {
-    const vnode = {
-        type,
-        props,
-        children,
-        shapeFlags: getShapeFlage(type),
-    };
-    if (typeof children === "string") {
-        //位运算通过|来赋值
-        vnode.shapeFlags |= 4 /* ShapeFlags.TEXT_CHILDREN */;
-    }
-    else if (Array.isArray(children)) {
-        vnode.shapeFlags |= 8 /* ShapeFlags.ARRAY_CHILDREN */;
-    }
-    //父组件是否有传入插槽内容
-    //首先要为一个组件vnode，并且children为h函数返回的一个对象
-    if (vnode.shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
-        if (isObject(vnode.children)) {
-            vnode.shapeFlags |= 16 /* ShapeFlags.SLOT_CHILDREN */;
-        }
-    }
-    return vnode;
-}
-function getShapeFlage(type) {
-    if (typeof type == "string") {
-        //'div' 'span'
-        return 1 /* ShapeFlags.ElEMENT */;
-    }
-    else if (isObject(type)) {
-        //{name:"",render(){},setup(){}}
-        return 2 /* ShapeFlags.STATEFUL_COMPONENT */;
-    }
-}
-//创建text节点
-function createTextVNode(text) {
-    return createVNode(Text, {}, text);
-}
-
-function h(type, props, children) {
-    return createVNode(type, props, children);
-}
-
 let targetsMap = new Map();
 function trigger(target, key) {
     let targetMap = targetsMap.get(target);
@@ -253,104 +209,150 @@ function setCurrentInstance(instance) {
     currentInstance = instance;
 }
 
-function render(vnode, container) {
-    path(vnode, container, null);
-}
-function path(vnode, container, parentComponent) {
-    const { shapeFlags, type } = vnode;
-    //区分vnode中的type
-    switch (type) {
-        case Fragment:
-            //Fragment -> 只渲染 children
-            processFragment(vnode, container, parentComponent);
-            break;
-        case Text:
-            processText(vnode, container);
-            break;
-        default:
-            if (shapeFlags & 1 /* ShapeFlags.ElEMENT */) {
-                //处理element
-                processElement(vnode, container, parentComponent);
-            }
-            else if (shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
-                //处理组件
-                processComponent(vnode, container, parentComponent);
-            }
+const Fragment = Symbol("Fragment");
+const Text = Symbol("Text");
+function createVNode(type, props, children) {
+    const vnode = {
+        type,
+        props,
+        children,
+        shapeFlags: getShapeFlage(type),
+    };
+    if (typeof children === "string") {
+        //位运算通过|来赋值
+        vnode.shapeFlags |= 4 /* ShapeFlags.TEXT_CHILDREN */;
     }
-}
-//处理type 为 Fragment 类型的节点 渲染子节点，将渲染后的dom直接放到container下
-function processFragment(vnode, container, parentComponent) {
-    mountChildren(vnode.children, container, parentComponent);
-}
-//处理文本节点，通过createTextNode方法，将文本内容直接显示，内容外面没有标签包裹
-function processText(vnode, container) {
-    const { children } = vnode;
-    const textNode = (vnode.el = document.createTextNode(children));
-    container.append(textNode);
-}
-//处理组件
-function processComponent(vnode, container, parentComponent) {
-    mountComponent(vnode, container, parentComponent);
-}
-//处理Element 节点
-function processElement(vnode, container, parentComponent) {
-    //init
-    mountElement(vnode, container, parentComponent);
-    //TODO update
-}
-//挂载组件
-function mountComponent(initinalVnode, container, parentComponent) {
-    const instance = createComponentInstance(initinalVnode, parentComponent);
-    setupComponent(instance);
-    setupRenderEffect(instance, initinalVnode, container);
-}
-function setupRenderEffect(instance, initinalVnode, container) {
-    const { proxy } = instance;
-    const subTree = instance.render.call(proxy);
-    //subTree 为组件对应的vnode
-    //组件转换完毕后，再次patch vnode=>element
-    path(subTree, container, instance);
-    //等element挂载完毕后，再赋值el
-    initinalVnode.el = subTree.el;
-}
-//挂载element
-function mountElement(vnode, container, parentComponent) {
-    const { type, props, children, shapeFlags } = vnode;
-    const el = (vnode.el = document.createElement(type));
-    if (shapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
-        el.textContent = children;
+    else if (Array.isArray(children)) {
+        vnode.shapeFlags |= 8 /* ShapeFlags.ARRAY_CHILDREN */;
     }
-    else if (shapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
-        mountChildren(vnode.children, el, parentComponent);
-    }
-    for (const key in props) {
-        const val = props[key];
-        if (isOn(key)) {
-            const event = key.slice(2).toLowerCase();
-            el.addEventListener(event, val);
-        }
-        else {
-            el.setAttribute(key, val);
+    //父组件是否有传入插槽内容
+    //首先要为一个组件vnode，并且children为h函数返回的一个对象
+    if (vnode.shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
+        if (isObject(vnode.children)) {
+            vnode.shapeFlags |= 16 /* ShapeFlags.SLOT_CHILDREN */;
         }
     }
-    container.append(el);
+    return vnode;
 }
-//挂载子组件
-function mountChildren(vnodes, el, parentComponent) {
-    for (const child of vnodes) {
-        path(child, el, parentComponent);
+function getShapeFlage(type) {
+    if (typeof type == "string") {
+        //'div' 'span'
+        return 1 /* ShapeFlags.ElEMENT */;
     }
+    else if (isObject(type)) {
+        //{name:"",render(){},setup(){}}
+        return 2 /* ShapeFlags.STATEFUL_COMPONENT */;
+    }
+}
+//创建text节点
+function createTextVNode(text) {
+    return createVNode(Text, {}, text);
 }
 
-function createApp(rootComponent) {
-    return {
-        mount(rootContainer) {
-            //1.转化为vnode，后续所有操作都会基于虚拟节点做处理
-            const vnode = createVNode(rootComponent);
-            //2.render 实现渲染
-            render(vnode, rootContainer);
-        },
+function createAppAPI(render) {
+    return function createApp(rootComponent) {
+        return {
+            mount(rootContainer) {
+                //1.转化为vnode，后续所有操作都会基于虚拟节点做处理
+                const vnode = createVNode(rootComponent);
+                //2.render 实现渲染
+                render(vnode, rootContainer);
+            },
+        };
     };
+}
+
+function createRenderer(options) {
+    const { createElement, patchProp, insert } = options;
+    function render(vnode, container) {
+        path(vnode, container, null);
+    }
+    function path(vnode, container, parentComponent) {
+        const { shapeFlags, type } = vnode;
+        //区分vnode中的type
+        switch (type) {
+            case Fragment:
+                //Fragment -> 只渲染 children
+                processFragment(vnode, container, parentComponent);
+                break;
+            case Text:
+                processText(vnode, container);
+                break;
+            default:
+                if (shapeFlags & 1 /* ShapeFlags.ElEMENT */) {
+                    //处理element
+                    processElement(vnode, container, parentComponent);
+                }
+                else if (shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
+                    //处理组件
+                    processComponent(vnode, container, parentComponent);
+                }
+        }
+    }
+    //处理type 为 Fragment 类型的节点 渲染子节点，将渲染后的dom直接放到container下
+    function processFragment(vnode, container, parentComponent) {
+        mountChildren(vnode.children, container, parentComponent);
+    }
+    //处理文本节点，通过createTextNode方法，将文本内容直接显示，内容外面没有标签包裹
+    function processText(vnode, container) {
+        const { children } = vnode;
+        const textNode = (vnode.el = document.createTextNode(children));
+        container.append(textNode);
+    }
+    //处理组件
+    function processComponent(vnode, container, parentComponent) {
+        mountComponent(vnode, container, parentComponent);
+    }
+    //处理Element 节点
+    function processElement(vnode, container, parentComponent) {
+        //init
+        mountElement(vnode, container, parentComponent);
+        //TODO update
+    }
+    //挂载组件
+    function mountComponent(initinalVnode, container, parentComponent) {
+        const instance = createComponentInstance(initinalVnode, parentComponent);
+        setupComponent(instance);
+        setupRenderEffect(instance, initinalVnode, container);
+    }
+    function setupRenderEffect(instance, initinalVnode, container) {
+        const { proxy } = instance;
+        const subTree = instance.render.call(proxy);
+        //subTree 为组件对应的vnode
+        //组件转换完毕后，再次patch vnode=>element
+        path(subTree, container, instance);
+        //等element挂载完毕后，再赋值el
+        initinalVnode.el = subTree.el;
+    }
+    //挂载element
+    function mountElement(vnode, container, parentComponent) {
+        const { type, props, children, shapeFlags } = vnode;
+        const el = (vnode.el = createElement(type));
+        if (shapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
+            el.textContent = children;
+        }
+        else if (shapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
+            mountChildren(vnode.children, el, parentComponent);
+        }
+        for (const key in props) {
+            const val = props[key];
+            patchProp(el, key, val);
+        }
+        insert(el, container);
+    }
+    //挂载子组件
+    function mountChildren(vnodes, el, parentComponent) {
+        for (const child of vnodes) {
+            path(child, el, parentComponent);
+        }
+    }
+    return {
+        createApp: createAppAPI(render),
+    };
+}
+
+function h(type, props, children) {
+    return createVNode(type, props, children);
 }
 
 function renderSlots(slots, slotName, props) {
@@ -364,7 +366,17 @@ function provide(key, value) {
     const currentInstance = getCurrentInstance();
     if (currentInstance) {
         let { provides, parent } = currentInstance;
+        //下面这个判断是确保 currentInstance.provides 只初始化一次
+        //否则当组件中provide 两次后 为currentInstance.provides初始化两次
+        //上一次设置的值会被覆盖
         if (provides === parent.provides) {
+            //子节点的provides 不能直接引用为父节点的provides
+            //不然当子节点中provide了和父节点相同key的值之后
+            //父节点provides值修改了
+            //之后在inject去获取值时，获取到的就是修改后的新值，而非父节点的原始数据
+            //这里的处理逻辑是 使用 Object.create 以父节点provides作为原型，创建一个新对象
+            //在此之后，inject中即可通过原型链获取到父节点provides中的数据
+            //同时在修改当前节点的provides值时，父节点的数据不会被修改
             currentInstance.provides = Object.create(parent.provides);
         }
         currentInstance.provides[key] = value;
@@ -385,6 +397,34 @@ function inject(key, defaultValue) {
             return defaultValue;
         }
     }
+}
+
+function createElement(type) {
+    return document.createElement(type);
+}
+function patchProp(el, key, val) {
+    if (isOn(key)) {
+        const event = key.slice(2).toLowerCase();
+        el.addEventListener(event, val);
+    }
+    else {
+        if (val === undefined || val === null) {
+            el.removeAttribute(key);
+        }
+        else {
+            el.setAttribute(key, val);
+        }
+    }
+}
+//insert 插入节点
+//anchor为null则insertBefore相当于是append
+//anchor为一个node节点
+function insert(el, parent, anchor = null) {
+    parent.insertBefore(el, anchor);
+}
+const renderer = createRenderer({ createElement, patchProp, insert });
+function createApp(rootComponent) {
+    return renderer.createApp(rootComponent);
 }
 
 export { createApp, createTextVNode, getCurrentInstance, h, inject, provide, renderSlots };
