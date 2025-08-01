@@ -27,3 +27,6 @@ export function capitalize(str: string) {
 export function toHandlerKey(str: string) {
   return str ? "on" + capitalize(camelize(str)) : "";
 }
+
+//返回一个空对象
+export const EMPTY_OBJ = {};

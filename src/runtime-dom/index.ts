@@ -9,6 +9,7 @@ function patchProp(el, key, val) {
     const event = key.slice(2).toLowerCase();
     el.addEventListener(event, val);
   } else {
+    //删除属性
     if (val === undefined || val === null) {
       el.removeAttribute(key);
     } else {
@@ -17,13 +18,18 @@ function patchProp(el, key, val) {
   }
 }
 
+//为元素设置文本内容
+function setElementText(text, el) {
+  el.textContent = text;
+}
+
 //insert 插入节点
 //anchor为null则insertBefore相当于是append
 //anchor为一个node节点
 function insert(el, parent, anchor = null) {
   parent.insertBefore(el, anchor);
 }
-const renderer = createRenderer({ createElement, patchProp, insert });
+const renderer = createRenderer({ createElement, patchProp, insert, setElementText });
 
 export function createApp(rootComponent) {
   return renderer.createApp(rootComponent);

@@ -1,5 +1,7 @@
 //是否为对象
 const isObject = (raw) => raw !== null && typeof raw === "object";
+//两个值是否相等
+const isSameValue = (val1, val2) => Object.is(val1, val2);
 //是否有属性值
 const hasOwn = (raw, key) => Object.prototype.hasOwnProperty.call(raw, key);
 //注册事件用 onClick
@@ -18,82 +20,6 @@ function capitalize(str) {
 //add -> onAdd
 function toHandlerKey(str) {
     return str ? "on" + capitalize(camelize(str)) : "";
-}
-
-let targetsMap = new Map();
-function trigger(target, key) {
-    let targetMap = targetsMap.get(target);
-    let deps = targetMap.get(key);
-    triggerEffect(deps);
-}
-function triggerEffect(deps) {
-    for (const effect of deps) {
-        if (effect.scheduler) {
-            effect.scheduler();
-        }
-        else {
-            effect.run();
-        }
-    }
-}
-
-//提前调用函数，之后就用引用的对象
-const reactiveGet = createGetter();
-const readonlyGet = createGetter(true, false);
-//shallowReadonlyGet  只追踪顶层属性的访问,直接修改顶层属性会被阻止,内部嵌套属性为普通对象
-const shallowReadonlyGet = createGetter(true, true);
-const reactiveSet = createSetter();
-const readonlySet = createReadonlySetter();
-function createGetter(isReadonly = false, isshallowReadonly = false) {
-    return function (target, key) {
-        if (key === "_isReactive" /* ReactiveFlags.IS_REACTIVE */) {
-            return !isReadonly;
-        }
-        if (key === "_isReadonly" /* ReactiveFlags.IS_READONLY */) {
-            return isReadonly;
-        }
-        const res = Reflect.get(target, key);
-        if (isObject(res) && !isshallowReadonly) {
-            return isReadonly ? readonly(res) : reactive(res);
-        }
-        return res;
-    };
-}
-function createSetter() {
-    return function (target, key, value) {
-        const res = Reflect.set(target, key, value);
-        trigger(target, key);
-        return res;
-    };
-}
-function createReadonlySetter() {
-    return function (target, key) {
-        console.warn(`该对象为readonly类型，${key} 不能被修改`);
-        //return false 会抛出错误
-        return true;
-    };
-}
-const reactiveHandler = {
-    get: reactiveGet,
-    set: reactiveSet,
-};
-const readonlyHandler = {
-    get: readonlyGet,
-    set: readonlySet,
-};
-const shallowReadonlyHandler = {
-    get: shallowReadonlyGet,
-    set: readonlySet,
-};
-
-function reactive(target) {
-    return new Proxy(target, reactiveHandler);
-}
-function readonly(target) {
-    return new Proxy(target, readonlyHandler);
-}
-function shallowReadonly(target) {
-    return new Proxy(target, shallowReadonlyHandler);
 }
 
 //父组件将emit函数传给子组件
@@ -147,6 +73,195 @@ function initProps(instance) {
     instance.props = instance.vnode.props || {};
 }
 
+class ReactiveEffect {
+    constructor(fn, scheduler) {
+        this.scheduler = scheduler;
+        this.deps = [];
+        this._fn = fn;
+    }
+    run() {
+        activeEffect = this;
+        const result = this._fn();
+        //将activeEffect置为null,防止多次收集
+        activeEffect = null;
+        return result;
+    }
+    stop() {
+        if (this.onStop)
+            this.onStop();
+        this.deps.forEach((dep) => {
+            dep.delete(this);
+        });
+    }
+}
+let targetsMap = new Map();
+function track(target, key) {
+    if (!activeEffect)
+        return;
+    let targetMap = targetsMap.get(key);
+    if (!targetMap) {
+        targetMap = new Map();
+        targetsMap.set(target, targetMap);
+    }
+    let deps = targetMap.get(key);
+    if (!deps) {
+        deps = new Set();
+        targetMap.set(key, deps);
+    }
+    trackEffect(deps);
+}
+function trackEffect(deps) {
+    if (!activeEffect)
+        return;
+    deps.add(activeEffect);
+    activeEffect.deps.push(deps);
+}
+function trigger(target, key) {
+    let targetMap = targetsMap.get(target);
+    let deps = targetMap.get(key);
+    triggerEffect(deps);
+}
+function triggerEffect(deps) {
+    for (const effect of deps) {
+        if (effect.scheduler) {
+            effect.scheduler();
+        }
+        else {
+            effect.run();
+        }
+    }
+}
+function stop(runner) {
+    runner._effect.stop();
+}
+let activeEffect = null;
+function effect(fn, options = {}) {
+    const _effect = new ReactiveEffect(fn, options.scheduler);
+    Object.assign(_effect, options);
+    _effect.run();
+    const runner = _effect.run.bind(_effect);
+    runner._effect = _effect;
+    return runner;
+}
+
+//提前调用函数，之后就用引用的对象
+const reactiveGet = createGetter();
+const readonlyGet = createGetter(true, false);
+//shallowReadonlyGet  只追踪顶层属性的访问,直接修改顶层属性会被阻止,内部嵌套属性为普通对象
+const shallowReadonlyGet = createGetter(true, true);
+const reactiveSet = createSetter();
+const readonlySet = createReadonlySetter();
+function createGetter(isReadonly = false, isshallowReadonly = false) {
+    return function (target, key) {
+        if (key === "_isReactive" /* ReactiveFlags.IS_REACTIVE */) {
+            return !isReadonly;
+        }
+        if (key === "_isReadonly" /* ReactiveFlags.IS_READONLY */) {
+            return isReadonly;
+        }
+        const res = Reflect.get(target, key);
+        track(target, key);
+        if (isObject(res) && !isshallowReadonly) {
+            return isReadonly ? readonly(res) : reactive(res);
+        }
+        return res;
+    };
+}
+function createSetter() {
+    return function (target, key, value) {
+        const res = Reflect.set(target, key, value);
+        trigger(target, key);
+        return res;
+    };
+}
+function createReadonlySetter() {
+    return function (target, key) {
+        console.warn(`该对象为readonly类型，${key} 不能被修改`);
+        //return false 会抛出错误
+        return true;
+    };
+}
+const reactiveHandler = {
+    get: reactiveGet,
+    set: reactiveSet,
+};
+const readonlyHandler = {
+    get: readonlyGet,
+    set: readonlySet,
+};
+const shallowReadonlyHandler = {
+    get: shallowReadonlyGet,
+    set: readonlySet,
+};
+
+function reactive(target) {
+    return new Proxy(target, reactiveHandler);
+}
+function readonly(target) {
+    return new Proxy(target, readonlyHandler);
+}
+function shallowReadonly(target) {
+    return new Proxy(target, shallowReadonlyHandler);
+}
+//通过_isReactive _isReadonly 这两个key去判断是否为readonly和reactive
+//两次取反 保证取得正确的值
+function isReactive(raw) {
+    return !!raw["_isReactive" /* ReactiveFlags.IS_REACTIVE */];
+}
+function isReadonly(raw) {
+    return !!raw["_isReadonly" /* ReactiveFlags.IS_READONLY */];
+}
+function isProxy(raw) {
+    return isReactive(raw) || isReadonly(raw);
+}
+
+class RefImpl {
+    constructor(value) {
+        this.deps = new Set();
+        this._is_Ref = true;
+        this._raw_value = value;
+    }
+    get value() {
+        trackEffect(this.deps);
+        debugger;
+        return isObject(this._raw_value) ? reactive(this._raw_value) : this._raw_value;
+    }
+    set value(newValue) {
+        if (isSameValue(this._raw_value, newValue))
+            return;
+        this._raw_value = newValue;
+        triggerEffect(this.deps);
+        return;
+    }
+}
+function ref(value) {
+    return new RefImpl(value);
+}
+function isRef(raw) {
+    return !!raw["_is_Ref"];
+}
+function unRef(raw) {
+    return isRef(raw) ? raw.value : raw;
+}
+//proxyRefs 自动解包，解包后的值仍是响应式
+function proxyRefs(raw) {
+    return new Proxy(raw, {
+        get(raw, key) {
+            return unRef(raw[key]);
+        },
+        set(raw, key, newValue) {
+            if (isRef(raw[key])) {
+                raw[key].value = unRef(newValue);
+                return true;
+            }
+            else {
+                Reflect.set(raw, key, newValue);
+                return true;
+            }
+        },
+    });
+}
+
 //创建组件实例
 function createComponentInstance(vnode, parentComponent) {
     const component = {
@@ -160,6 +275,9 @@ function createComponentInstance(vnode, parentComponent) {
         slots: {},
         provides: parentComponent ? parentComponent.provides : {},
         parent: parentComponent,
+        //isMounted 用于判断是第一次挂载还是更新
+        isMounted: false,
+        subTree: null,
     };
     //通过bind为emitEvent这一函数传入第一个参数component
     //后续接受用户传入的事件名和其他载荷
@@ -191,7 +309,8 @@ function setupStatefulComponent(instance) {
 function handleSetupResult(instance, setupResult) {
     //组件setup函数可能为对象或函数，返回函数即可看成h函数
     if (isObject(setupResult)) {
-        instance.setupState = setupResult;
+        //使用proxyRefs 自动解包
+        instance.setupState = proxyRefs(setupResult);
     }
     finishComponentSetup(instance);
 }
@@ -263,11 +382,11 @@ function createAppAPI(render) {
 }
 
 function createRenderer(options) {
-    const { createElement: hostCreateElement, patchProp: hostPatchProp, insert: hostInsert } = options;
+    const { createElement: hostCreateElement, patchProp: hostPatchProp, insert: hostInsert, setElementText: hostSetElementText, } = options;
     function render(vnode, container) {
-        path(vnode, container, null);
+        path(null, vnode, container, null);
     }
-    function path(vnode, container, parentComponent) {
+    function path(preVnode, vnode, container, parentComponent) {
         const { shapeFlags, type } = vnode;
         //区分vnode中的type
         switch (type) {
@@ -281,7 +400,7 @@ function createRenderer(options) {
             default:
                 if (shapeFlags & 1 /* ShapeFlags.ElEMENT */) {
                     //处理element
-                    processElement(vnode, container, parentComponent);
+                    processElement(preVnode, vnode, container, parentComponent);
                 }
                 else if (shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
                     //处理组件
@@ -304,10 +423,15 @@ function createRenderer(options) {
         mountComponent(vnode, container, parentComponent);
     }
     //处理Element 节点
-    function processElement(vnode, container, parentComponent) {
-        //init
-        mountElement(vnode, container, parentComponent);
-        //TODO update
+    function processElement(preVnode, vnode, container, parentComponent) {
+        if (!preVnode) {
+            //init
+            mountElement(vnode, container, parentComponent);
+        }
+        else {
+            //update
+            pathElement(preVnode, vnode);
+        }
     }
     //挂载组件
     function mountComponent(initinalVnode, container, parentComponent) {
@@ -316,13 +440,29 @@ function createRenderer(options) {
         setupRenderEffect(instance, initinalVnode, container);
     }
     function setupRenderEffect(instance, initinalVnode, container) {
-        const { proxy } = instance;
-        const subTree = instance.render.call(proxy);
-        //subTree 为组件对应的vnode
-        //组件转换完毕后，再次patch vnode=>element
-        path(subTree, container, instance);
-        //等element挂载完毕后，再赋值el
-        initinalVnode.el = subTree.el;
+        //effect可以实现当setup中依赖的值修改后，再次渲染元素
+        //配合元素更新逻辑，否则会生成新的dom元素
+        effect(() => {
+            const { proxy } = instance;
+            if (!instance.isMounted) {
+                //subTree 为组件对应的vnode
+                const subTree = (instance.subTree = instance.render.call(proxy));
+                //第一次挂载
+                //组件转换完毕后，再次patch vnode=>element
+                path(null, subTree, container, instance);
+                instance.isMounted = true;
+                //等element挂载完毕后，再赋值el
+                initinalVnode.el = subTree.el;
+            }
+            else {
+                //更新节点
+                const subTree = instance.render.call(proxy, proxy);
+                //prevSubTree更新前的节点
+                const prevSubTree = instance.subTree;
+                path(prevSubTree, subTree, container, instance);
+                instance.subTree = subTree;
+            }
+        });
     }
     //挂载element
     function mountElement(vnode, container, parentComponent) {
@@ -340,10 +480,22 @@ function createRenderer(options) {
         }
         hostInsert(el, container);
     }
+    //更新element
+    function pathElement(n1, n2, container, parentComponent) {
+        (n2.el = n1.el);
+        patchChildren(n1, n2);
+    }
+    //更新子元素
+    function patchChildren(n1, n2, container, parentComponent) {
+        n1.shapeFlags;
+        n2.shapeFlags;
+        console.log(n1, "就节点");
+        console.log(n2, "新节点");
+    }
     //挂载子组件
     function mountChildren(vnodes, el, parentComponent) {
         for (const child of vnodes) {
-            path(child, el, parentComponent);
+            path(null, child, el, parentComponent);
         }
     }
     return {
@@ -408,6 +560,7 @@ function patchProp(el, key, val) {
         el.addEventListener(event, val);
     }
     else {
+        //删除属性
         if (val === undefined || val === null) {
             el.removeAttribute(key);
         }
@@ -416,15 +569,19 @@ function patchProp(el, key, val) {
         }
     }
 }
+//为元素设置文本内容
+function setElementText(text, el) {
+    el.textContent = text;
+}
 //insert 插入节点
 //anchor为null则insertBefore相当于是append
 //anchor为一个node节点
 function insert(el, parent, anchor = null) {
     parent.insertBefore(el, anchor);
 }
-const renderer = createRenderer({ createElement, patchProp, insert });
+const renderer = createRenderer({ createElement, patchProp, insert, setElementText });
 function createApp(rootComponent) {
     return renderer.createApp(rootComponent);
 }
 
-export { createApp, createAppAPI, createRenderer, createTextVNode, getCurrentInstance, h, inject, provide, renderSlots };
+export { ReactiveEffect, createApp, createAppAPI, createRenderer, createTextVNode, effect, getCurrentInstance, h, inject, isProxy, isReactive, isReadonly, isRef, provide, proxyRefs, reactive, readonly, ref, renderSlots, shallowReadonly, stop, track, trackEffect, trigger, triggerEffect, unRef };

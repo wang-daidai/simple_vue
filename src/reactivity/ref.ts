@@ -11,6 +11,7 @@ class RefImpl {
 
   get value() {
     trackEffect(this.deps);
+    debugger;
     return isObject(this._raw_value) ? reactive(this._raw_value) : this._raw_value;
   }
   set value(newValue) {
@@ -33,7 +34,7 @@ export function unRef(raw: any) {
   return isRef(raw) ? raw.value : raw;
 }
 
-//proxyRefs 自动解包，接报后的值仍是响应式
+//proxyRefs 自动解包，解包后的值仍是响应式
 export function proxyRefs(raw: any) {
   return new Proxy(raw, {
     get(raw, key: string) {

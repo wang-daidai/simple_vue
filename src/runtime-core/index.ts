@@ -5,3 +5,4 @@ export { getCurrentInstance } from "./component";
 export { provide, inject } from "./apiInject";
 export { createRenderer } from "./render";
 export { createAppAPI } from "./createApp";
+export * from "../reactivity";
