@@ -11,12 +11,13 @@ export function createRenderer(options) {
     insert: hostInsert,
     setElementText: hostSetElementText,
     remove: hostRemove,
+    createTextNode: hostCreateTextNode,
   } = options;
   function render(vnode: any, container: any) {
     path(null, vnode, container, null);
   }
 
-  function path(preVnode: any, vnode: any, container: any, parentComponent) {
+  function path(preVnode: any, vnode: any, container: any, parentComponent, anchor = null) {
     const { shapeFlags, type } = vnode;
     //区分vnode中的type
     switch (type) {
@@ -30,7 +31,7 @@ export function createRenderer(options) {
       default:
         if (shapeFlags & ShapeFlags.ElEMENT) {
           //处理element
-          processElement(preVnode, vnode, container, parentComponent);
+          processElement(preVnode, vnode, container, parentComponent, anchor);
         } else if (shapeFlags & ShapeFlags.STATEFUL_COMPONENT) {
           //处理组件
           processComponent(vnode, container, parentComponent);
@@ -44,7 +45,7 @@ export function createRenderer(options) {
   //处理文本节点，通过createTextNode方法，将文本内容直接显示，内容外面没有标签包裹
   function processText(vnode, container) {
     const { children } = vnode;
-    const textNode = (vnode.el = document.createTextNode(children));
+    const textNode = (vnode.el = hostCreateTextNode(children));
     container.append(textNode);
   }
   //处理组件
@@ -52,10 +53,10 @@ export function createRenderer(options) {
     mountComponent(vnode, container, parentComponent);
   }
   //处理Element 节点
-  function processElement(preVnode, vnode: any, container: any, parentComponent) {
+  function processElement(preVnode, vnode: any, container: any, parentComponent, anchor = null) {
     if (!preVnode) {
       //init
-      mountElement(vnode, container, parentComponent);
+      mountElement(vnode, container, parentComponent, anchor);
     } else {
       //update
       patchElement(preVnode, vnode, container, parentComponent);
@@ -95,7 +96,7 @@ export function createRenderer(options) {
   }
 
   //挂载element
-  function mountElement(vnode: any, container: any, parentComponent) {
+  function mountElement(vnode: any, container: any, parentComponent, anchor) {
     const { type, props, children, shapeFlags } = vnode;
     const el = (vnode.el = hostCreateElement(type));
 
@@ -108,7 +109,7 @@ export function createRenderer(options) {
       const val = props[key];
       hostPatchProp(el, key, val);
     }
-    hostInsert(el, container);
+    hostInsert(el, container, anchor);
   }
 
   //更新element
@@ -142,8 +143,6 @@ export function createRenderer(options) {
   }
   //更新子元素
   function patchChildren(n1, n2, container, parentComponent) {
-    console.log(n1, "旧节点");
-    console.log(n2, "新节点");
     const { shapeFlags: preShapeFlags, children: preChildren } = n1;
     const { children: nextChildren, shapeFlags: nextShapeFlags } = n2;
     //新节点的元素内容是文本
@@ -165,6 +164,7 @@ export function createRenderer(options) {
     if (nextShapeFlags & ShapeFlags.ARRAY_CHILDREN) {
       //老的是数组
       if (preShapeFlags & ShapeFlags.ARRAY_CHILDREN) {
+        patchKeyedChildren(preChildren, nextChildren, container, parentComponent);
       }
       //老的是文本
       if (preShapeFlags & ShapeFlags.TEXT_CHILDREN) {
@@ -175,7 +175,60 @@ export function createRenderer(options) {
       }
     }
   }
+  function patchKeyedChildren(c1, c2, container, parentComponent) {
+    console.log(c1, "旧节点");
+    console.log(c2, "新节点");
+    let i = 0;
+    let e1 = c1.length - 1;
+    let e2 = c2.length - 1;
 
+    //左侧
+    while (i <= e1 && i <= e2) {
+      const n1 = c1[i];
+      const n2 = c2[i];
+      if (isSameVNodeType(n1, n2)) {
+        //相同节点进一步对比渲染
+        path(n1, n2, container, parentComponent);
+      } else {
+        break;
+      }
+      i++;
+    }
+
+    //右侧
+    while (i <= e1 && i <= e2) {
+      const n1 = c1[e1];
+      const n2 = c2[e2];
+      if (isSameVNodeType(n1, n2)) {
+        path(n1, n2, container, parentComponent);
+      } else {
+        break;
+      }
+      e1--;
+      e2--;
+    }
+
+    //新的比老的长
+    if (i > e1 && i <= e2) {
+      //这里要使用inserNode 如何新增的在左侧则要使用anchor锚点插入
+      let inserNode = c2[e2 + 1] ? c2[e2 + 1].el : null;
+      for (let j = i; j <= e2; j++) {
+        path(null, c2[j], container, parentComponent, inserNode);
+      }
+    }
+    //老的比新的长
+    if (i > e2 && i <= e1) {
+      for (let j = i; j <= e1; j++) {
+        //删除多出来的
+        hostRemove(c1[j].el);
+      }
+    }
+  }
+  function isSameVNodeType(n1, n2) {
+    //type key
+    //如果虚拟节点的type即div p 相同以及key相同，则视为同一节点
+    return n1.type === n2.type && n1.key === n2.key;
+  }
   //挂载子组件
   function mountChildren(vnodes: any, el: any, parentComponent) {
     for (const child of vnodes) {

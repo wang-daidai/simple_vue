@@ -33,11 +33,16 @@ function remove(child) {
 
 //insert 插入节点
 //anchor为null则insertBefore相当于是append
-//anchor为一个node节点
+//anchor为一个node节点时，可看成在parent父节点中，anchor这个锚点前插入el元素
 function insert(el, parent, anchor = null) {
   parent.insertBefore(el, anchor);
 }
-const renderer = createRenderer({ createElement, patchProp, insert, setElementText, remove });
+
+//创建文本节点
+function createTextNode(text) {
+  return document.createTextNode(text);
+}
+const renderer = createRenderer({ createElement, patchProp, insert, setElementText, remove, createTextNode });
 
 export function createApp(rootComponent) {
   return renderer.createApp(rootComponent);

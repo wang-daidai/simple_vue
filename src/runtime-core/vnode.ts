@@ -8,6 +8,7 @@ export function createVNode(type: any, props?: any, children?: any) {
     props,
     children,
     shapeFlags: getShapeFlage(type),
+    key: props && props.key,
   };
   if (typeof children === "string") {
     //位运算通过|来赋值
