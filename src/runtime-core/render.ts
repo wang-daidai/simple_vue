@@ -178,6 +178,8 @@ export function createRenderer(options) {
   function patchKeyedChildren(c1, c2, container, parentComponent) {
     console.log(c1, "旧节点");
     console.log(c2, "新节点");
+    console.log(container, "container");
+
     let i = 0;
     let e1 = c1.length - 1;
     let e2 = c2.length - 1;
@@ -232,7 +234,17 @@ export function createRenderer(options) {
     const toBePatched = e2 - i + 1;
     const keyToMap = new Map();
 
-    //把新节点的key存取来
+    //记录是否需要移动位置
+    let moved = false;
+    let maxNewIndexSoFar = 0;
+
+    //创建一个定长数组，这样性能是最好的
+    const newIndexToOldIndexMap = new Array(toBePatched);
+    for (let j = 0; j < toBePatched; j++) {
+      newIndexToOldIndexMap[j] = 0;
+    }
+
+    //把新节点的key存取来 key=>新序列中的下标  {e:2,c:3,d:4}
     for (let j = s2; j <= e2; j++) {
       const nextChild = c2[j];
       keyToMap.set(nextChild.key, j);
@@ -264,7 +276,52 @@ export function createRenderer(options) {
       if (!newIndex) {
         hostRemove(prevChild.el);
       } else {
+        if (newIndex >= maxNewIndexSoFar) {
+          maxNewIndexSoFar = newIndex;
+        } else {
+          moved = true;
+        }
+
+        //一种神奇的转化，映射新children中节点的顺序，提供出来 用于计算最长递增子序列
+        //5.2.1 newIndexToOldIndexMap = [5,3,4] 得到的最长子序列是[1,2]
+        //赋值是 j 有可能为0 因为实际使用时0代表这个节点在老的中没有出现过，需要创建
+        //则赋值时加1，避免赋值0
+        newIndexToOldIndexMap[newIndex - s2] = j + 1;
+        path(prevChild, c2[newIndex], container, parentComponent);
+
+        //新的中存在 渲染的节点数 patched++
         patched++;
+      }
+    }
+    //getSequence 计算最长递增子序列比较费性能
+    //所以可以判断，节点是否需要移动，如果不需要移动位置则就不计算了
+    const increasingNewIndexSequence = moved ? getSequence(newIndexToOldIndexMap) : [];
+    // let j = 0;
+    // for (let i = 0; i < patched; i++) {
+    //   //如果这个元素没有出现在最长子序列中，则表示该元素需要移动
+    //   //如i=0代表5 表示d节点，因为最长序列中第一个元素是1，不为0
+    //   //表明d节点不在稳定序列中，需要移动该节点
+    //   if (i !== increasingNewIndexSequence[j]) {
+    //因为要调整位置时，需要确定插入在哪个位置前，例如这里要调整e的位置，e此时是第一个节点，要插入到节点c之前
+    //c有可能不在稳定序列中，也需要调整位置，因此不能这样按正序去计算
+    //要用倒叙去处理，最后一个节点插在f节点前，f节点是固定的
+    //     console.log("移动位置");
+    //   } else {
+    //     j++;
+    //   }
+    // }
+
+    let j = increasingNewIndexSequence.length - 1;
+    for (let i = patched - 1; i >= 0; i--) {
+      const newIndex = i + s2;
+      const nextChild = c2[newIndex];
+      const anchor = newIndex + 1 < c2.length ? c2[newIndex + 1].el : null;
+      //j小于0后，直接移动
+      if (j < 0 || i !== increasingNewIndexSequence[j]) {
+        //移动位置
+        hostInsert(nextChild.el, container, anchor);
+      } else {
+        j--;
       }
     }
   }
@@ -288,4 +345,46 @@ export function createRenderer(options) {
   return {
     createApp: createAppAPI(render),
   };
+}
+
+//最长递增子序列算法
+function getSequence(arr: number[]): number[] {
+  const p = arr.slice();
+  const result = [0];
+  let i, j, u, v, c;
+  const len = arr.length;
+  for (i = 0; i < len; i++) {
+    const arrI = arr[i];
+    if (arrI !== 0) {
+      j = result[result.length - 1];
+      if (arr[j] < arrI) {
+        p[i] = j;
+        result.push(i);
+        continue;
+      }
+      u = 0;
+      v = result.length - 1;
+      while (u < v) {
+        c = (u + v) >> 1;
+        if (arr[result[c]] < arrI) {
+          u = c + 1;
+        } else {
+          v = c;
+        }
+      }
+      if (arrI < arr[result[u]]) {
+        if (u > 0) {
+          p[i] = result[u - 1];
+        }
+        result[u] = i;
+      }
+    }
+  }
+  u = result.length;
+  v = result[u - 1];
+  while (u-- > 0) {
+    result[u] = v;
+    v = p[v];
+  }
+  return result;
 }
