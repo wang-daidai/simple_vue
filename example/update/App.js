@@ -11,7 +11,6 @@ export const App = {
       bar: "bar",
     });
     const onChangePropsDemo1 = () => {
-      debugger;
       props.value.foo = "new-foo";
     };
     const onChangePropsDemo2 = () => {
@@ -32,7 +31,6 @@ export const App = {
     };
   },
   render() {
-    debugger;
     return h(
       "div",
       {
@@ -46,7 +44,7 @@ export const App = {
           {
             onClick: this.onClick,
           },
-          "点击"
+          "点击修改count"
         ),
         h(
           "button",

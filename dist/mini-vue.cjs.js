@@ -100,7 +100,7 @@ let targetsMap = new Map();
 function track(target, key) {
     if (!activeEffect)
         return;
-    let targetMap = targetsMap.get(key);
+    let targetMap = targetsMap.get(target);
     if (!targetMap) {
         targetMap = new Map();
         targetsMap.set(target, targetMap);
@@ -225,8 +225,7 @@ class RefImpl {
     }
     get value() {
         trackEffect(this.deps);
-        debugger;
-        return isObject(this._raw_value) ? reactive(this._raw_value) : this._raw_value;
+        return isObject(this._raw_value) && !isReactive(this._raw_value) ? reactive(this._raw_value) : this._raw_value;
     }
     set value(newValue) {
         if (isSameValue(this._raw_value, newValue))

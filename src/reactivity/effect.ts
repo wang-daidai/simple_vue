@@ -24,7 +24,8 @@ export class ReactiveEffect {
 let targetsMap = new Map();
 export function track(target: any, key: string) {
   if (!activeEffect) return;
-  let targetMap = targetsMap.get(key);
+  //这里是target不是key bugfix
+  let targetMap = targetsMap.get(target);
   if (!targetMap) {
     targetMap = new Map();
     targetsMap.set(target, targetMap);

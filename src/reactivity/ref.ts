@@ -1,6 +1,6 @@
 import { isObject, isSameValue } from "../shared";
 import { trackEffect, triggerEffect } from "./effect";
-import { reactive } from "./reactive";
+import { isReactive, reactive } from "./reactive";
 class RefImpl {
   private _raw_value: any;
   public deps = new Set();
@@ -11,8 +11,7 @@ class RefImpl {
 
   get value() {
     trackEffect(this.deps);
-    debugger;
-    return isObject(this._raw_value) ? reactive(this._raw_value) : this._raw_value;
+    return isObject(this._raw_value) && !isReactive(this._raw_value) ? reactive(this._raw_value) : this._raw_value;
   }
   set value(newValue) {
     if (isSameValue(this._raw_value, newValue)) return;

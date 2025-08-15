@@ -73,7 +73,6 @@ export function createRenderer(options) {
     //配合元素更新逻辑，否则会生成新的dom元素
     effect(() => {
       const { proxy } = instance;
-
       if (!instance.isMounted) {
         //subTree 为组件对应的vnode
         const subTree = (instance.subTree = instance.render.call(proxy));
@@ -124,7 +123,7 @@ export function createRenderer(options) {
   function patchChildren(n1, n2, container, parentComponent) {
     const preShapeFlags = n1.shapeFlags;
     const shapeFlags = n2.shapeFlags;
-    console.log(n1, "就节点");
+    console.log(n1, "旧节点");
     console.log(n2, "新节点");
     if (shapeFlags & ShapeFlags.TEXT_CHILDREN) {
       //新节点的元素内容是文本
