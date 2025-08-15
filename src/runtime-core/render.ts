@@ -10,6 +10,7 @@ export function createRenderer(options) {
     patchProp: hostPatchProp,
     insert: hostInsert,
     setElementText: hostSetElementText,
+    remove: hostRemove,
   } = options;
   function render(vnode: any, container: any) {
     path(null, vnode, container, null);
@@ -64,7 +65,6 @@ export function createRenderer(options) {
   //挂载组件
   function mountComponent(initinalVnode: any, container: any, parentComponent) {
     const instance = createComponentInstance(initinalVnode, parentComponent);
-
     setupComponent(instance);
     setupRenderEffect(instance, initinalVnode, container);
   }
@@ -142,12 +142,37 @@ export function createRenderer(options) {
   }
   //更新子元素
   function patchChildren(n1, n2, container, parentComponent) {
-    const preShapeFlags = n1.shapeFlags;
-    const shapeFlags = n2.shapeFlags;
     console.log(n1, "旧节点");
     console.log(n2, "新节点");
-    if (shapeFlags & ShapeFlags.TEXT_CHILDREN) {
-      //新节点的元素内容是文本
+    const { shapeFlags: preShapeFlags, children: preChildren } = n1;
+    const { children: nextChildren, shapeFlags: nextShapeFlags } = n2;
+    //新节点的元素内容是文本
+    if (nextShapeFlags & ShapeFlags.TEXT_CHILDREN) {
+      //老的是数组
+      if (preShapeFlags & ShapeFlags.ARRAY_CHILDREN) {
+        //删除老的内容
+        unmountChildren(preChildren);
+      }
+      //老的是文本
+      if (preShapeFlags & ShapeFlags.TEXT_CHILDREN) {
+        if (preChildren === nextChildren) {
+          return;
+        }
+      }
+      hostSetElementText(nextChildren, container);
+    }
+    //新的是数组
+    if (nextShapeFlags & ShapeFlags.ARRAY_CHILDREN) {
+      //老的是数组
+      if (preShapeFlags & ShapeFlags.ARRAY_CHILDREN) {
+      }
+      //老的是文本
+      if (preShapeFlags & ShapeFlags.TEXT_CHILDREN) {
+        //将老的文本置为空
+        hostSetElementText("", container);
+        //创建新的
+        mountChildren(nextChildren, container, parentComponent);
+      }
     }
   }
 
@@ -157,7 +182,12 @@ export function createRenderer(options) {
       path(null, child, el, parentComponent);
     }
   }
-
+  function unmountChildren(children) {
+    for (const child of children) {
+      const el = child.el;
+      hostRemove(el);
+    }
+  }
   return {
     createApp: createAppAPI(render),
   };

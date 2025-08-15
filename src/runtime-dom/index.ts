@@ -23,13 +23,21 @@ function setElementText(text, el) {
   el.textContent = text;
 }
 
+//删除子节点
+function remove(child) {
+  const parent = child.parentNode;
+  if (parent) {
+    parent.removeChild(child);
+  }
+}
+
 //insert 插入节点
 //anchor为null则insertBefore相当于是append
 //anchor为一个node节点
 function insert(el, parent, anchor = null) {
   parent.insertBefore(el, anchor);
 }
-const renderer = createRenderer({ createElement, patchProp, insert, setElementText });
+const renderer = createRenderer({ createElement, patchProp, insert, setElementText, remove });
 
 export function createApp(rootComponent) {
   return renderer.createApp(rootComponent);

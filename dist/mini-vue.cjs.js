@@ -386,7 +386,7 @@ function createAppAPI(render) {
 }
 
 function createRenderer(options) {
-    const { createElement: hostCreateElement, patchProp: hostPatchProp, insert: hostInsert, setElementText: hostSetElementText, } = options;
+    const { createElement: hostCreateElement, patchProp: hostPatchProp, insert: hostInsert, setElementText: hostSetElementText, remove: hostRemove, } = options;
     function render(vnode, container) {
         path(null, vnode, container, null);
     }
@@ -434,7 +434,7 @@ function createRenderer(options) {
         }
         else {
             //update
-            patchElement(preVnode, vnode);
+            patchElement(preVnode, vnode, container, parentComponent);
         }
     }
     //挂载组件
@@ -490,7 +490,7 @@ function createRenderer(options) {
         const oldProps = n1.props || EMPTY_OBJ;
         const newProps = n2.props || EMPTY_OBJ;
         patchProps(oldProps, newProps, el);
-        patchChildren(n1, n2);
+        patchChildren(n1, n2, el, parentComponent);
     }
     //更新props
     function patchProps(oldProps, newProps, el) {
@@ -513,15 +513,46 @@ function createRenderer(options) {
     }
     //更新子元素
     function patchChildren(n1, n2, container, parentComponent) {
-        n1.shapeFlags;
-        n2.shapeFlags;
         console.log(n1, "旧节点");
         console.log(n2, "新节点");
+        const { shapeFlags: preShapeFlags, children: preChildren } = n1;
+        const { el, children: nextChildren, shapeFlags: nextShapeFlags } = n2;
+        //新节点的元素内容是文本
+        if (nextShapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
+            //老的是数组
+            if (preShapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
+                //删除老的内容
+                unmountChildren(preChildren);
+            }
+            //老的是文本
+            if (preShapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
+                if (preChildren === nextChildren) {
+                    return;
+                }
+            }
+            hostSetElementText(nextChildren, el);
+        }
+        //新的是数组
+        if (nextShapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
+            //老的是文本
+            if (preShapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
+                //将老的文本置为空
+                hostSetElementText("", el);
+                //创建新的
+                mountChildren(nextChildren, el, parentComponent);
+            }
+        }
     }
     //挂载子组件
     function mountChildren(vnodes, el, parentComponent) {
         for (const child of vnodes) {
             path(null, child, el, parentComponent);
+        }
+    }
+    function unmountChildren(children) {
+        for (const child of children) {
+            const el = child.el;
+            hostRemove(el);
         }
     }
     return {
@@ -599,13 +630,20 @@ function patchProp(el, key, val) {
 function setElementText(text, el) {
     el.textContent = text;
 }
+//删除子节点
+function remove(child) {
+    const parent = child.parentNode;
+    if (parent) {
+        parent.removeChild(child);
+    }
+}
 //insert 插入节点
 //anchor为null则insertBefore相当于是append
 //anchor为一个node节点
 function insert(el, parent, anchor = null) {
     parent.insertBefore(el, anchor);
 }
-const renderer = createRenderer({ createElement, patchProp, insert, setElementText });
+const renderer = createRenderer({ createElement, patchProp, insert, setElementText, remove });
 function createApp(rootComponent) {
     return renderer.createApp(rootComponent);
 }
