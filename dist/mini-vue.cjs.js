@@ -593,6 +593,36 @@ function createRenderer(options) {
                 hostRemove(c1[j].el);
             }
         }
+        //中间对比
+        let s1 = i;
+        let s2 = i;
+        const keyToMap = new Map();
+        //把新节点的key存取来
+        for (let j = s2; j <= e2; j++) {
+            const nextChild = c2[j];
+            keyToMap.set(nextChild.key, j);
+        }
+        for (let j = s1; j <= e1; j++) {
+            const prevChild = c1[j];
+            let newIndex;
+            if (prevChild.key != null) {
+                //如果旧的元素有key则去映射表里查找
+                newIndex = keyToMap.get(prevChild.key);
+            }
+            else {
+                //没有key则遍历查找
+                for (let k = s1; k <= e2; k++) {
+                    if (isSameVNodeType(prevChild, c2[k])) {
+                        newIndex = k;
+                        break;
+                    }
+                }
+            }
+            //新的中不存在则删除
+            if (!newIndex) {
+                hostRemove(prevChild.el);
+            }
+        }
     }
     function isSameVNodeType(n1, n2) {
         //type key
