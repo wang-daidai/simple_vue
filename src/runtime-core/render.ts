@@ -312,16 +312,22 @@ export function createRenderer(options) {
     // }
 
     let j = increasingNewIndexSequence.length - 1;
-    for (let i = patched - 1; i >= 0; i--) {
+    for (let i = toBePatched - 1; i >= 0; i--) {
       const newIndex = i + s2;
       const nextChild = c2[newIndex];
       const anchor = newIndex + 1 < c2.length ? c2[newIndex + 1].el : null;
-      //j小于0后，直接移动
-      if (j < 0 || i !== increasingNewIndexSequence[j]) {
-        //移动位置
-        hostInsert(nextChild.el, container, anchor);
-      } else {
-        j--;
+
+      if (newIndexToOldIndexMap[i] === 0) {
+        //是0 说明这个节点原来没有 需要创建
+        path(null, nextChild, container, parentComponent, anchor);
+      } else if (moved) {
+        //j小于0后，直接移动
+        if (j < 0 || i !== increasingNewIndexSequence[j]) {
+          //移动位置
+          hostInsert(nextChild.el, container, anchor);
+        } else {
+          j--;
+        }
       }
     }
   }

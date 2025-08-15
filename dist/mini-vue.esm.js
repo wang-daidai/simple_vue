@@ -599,12 +599,15 @@ function createRenderer(options) {
         //toBePatched 要新增的节点数
         const toBePatched = e2 - i + 1;
         const keyToMap = new Map();
+        //记录是否需要移动位置
+        let moved = false;
+        let maxNewIndexSoFar = 0;
         //创建一个定长数组，这样性能是最好的
         const newIndexToOldIndexMap = new Array(toBePatched);
         for (let j = 0; j < toBePatched; j++) {
             newIndexToOldIndexMap[j] = 0;
         }
-        //把新节点的key存取来
+        //把新节点的key存取来 key=>新序列中的下标  {e:2,c:3,d:4}
         for (let j = s2; j <= e2; j++) {
             const nextChild = c2[j];
             keyToMap.set(nextChild.key, j);
@@ -635,6 +638,12 @@ function createRenderer(options) {
                 hostRemove(prevChild.el);
             }
             else {
+                if (newIndex >= maxNewIndexSoFar) {
+                    maxNewIndexSoFar = newIndex;
+                }
+                else {
+                    moved = true;
+                }
                 //一种神奇的转化，映射新children中节点的顺序，提供出来 用于计算最长递增子序列
                 //5.2.1 newIndexToOldIndexMap = [5,3,4] 得到的最长子序列是[1,2]
                 //赋值是 j 有可能为0 因为实际使用时0代表这个节点在老的中没有出现过，需要创建
@@ -645,7 +654,9 @@ function createRenderer(options) {
                 patched++;
             }
         }
-        const increasingNewIndexSequence = getSequence(newIndexToOldIndexMap);
+        //getSequence 计算最长递增子序列比较费性能
+        //所以可以判断，节点是否需要移动，如果不需要移动位置则就不计算了
+        const increasingNewIndexSequence = moved ? getSequence(newIndexToOldIndexMap) : [];
         // let j = 0;
         // for (let i = 0; i < patched; i++) {
         //   //如果这个元素没有出现在最长子序列中，则表示该元素需要移动
@@ -661,16 +672,23 @@ function createRenderer(options) {
         //   }
         // }
         let j = increasingNewIndexSequence.length - 1;
-        for (let i = patched - 1; i >= 0; i--) {
+        for (let i = toBePatched - 1; i >= 0; i--) {
             const newIndex = i + s2;
             const nextChild = c2[newIndex];
             const anchor = newIndex + 1 < c2.length ? c2[newIndex + 1].el : null;
-            if (i !== increasingNewIndexSequence[j]) {
-                //移动位置
-                hostInsert(nextChild.el, container, anchor);
+            if (newIndexToOldIndexMap[i] === 0) {
+                //是0 说明这个节点原来没有 需要创建
+                path(null, nextChild, container, parentComponent, anchor);
             }
-            else {
-                j--;
+            else if (moved) {
+                //j小于0后，直接移动
+                if (j < 0 || i !== increasingNewIndexSequence[j]) {
+                    //移动位置
+                    hostInsert(nextChild.el, container, anchor);
+                }
+                else {
+                    j--;
+                }
             }
         }
     }
