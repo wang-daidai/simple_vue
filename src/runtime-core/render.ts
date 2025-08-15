@@ -3,6 +3,7 @@ import { createComponentInstance, setupComponent } from "./component";
 import { Fragment, Text } from "./vnode";
 import { createAppAPI } from "./createApp";
 import { effect } from "../reactivity";
+import { hasOwn, EMPTY_OBJ } from "@/shared";
 export function createRenderer(options) {
   const {
     createElement: hostCreateElement,
@@ -56,7 +57,7 @@ export function createRenderer(options) {
       mountElement(vnode, container, parentComponent);
     } else {
       //update
-      pathElement(preVnode, vnode, container, parentComponent);
+      patchElement(preVnode, vnode, container, parentComponent);
     }
   }
 
@@ -93,9 +94,6 @@ export function createRenderer(options) {
     });
   }
 
-  //TODO更新组件
-  function updateComponent(vnode: any, container: any) {}
-
   //挂载element
   function mountElement(vnode: any, container: any, parentComponent) {
     const { type, props, children, shapeFlags } = vnode;
@@ -114,11 +112,34 @@ export function createRenderer(options) {
   }
 
   //更新element
-  function pathElement(n1, n2, container, parentComponent) {
+  function patchElement(n1, n2, container, parentComponent) {
     const el = (n2.el = n1.el);
+
+    const oldProps = n1.props || EMPTY_OBJ;
+    const newProps = n2.props || EMPTY_OBJ;
+    patchProps(oldProps, newProps, el);
+
     patchChildren(n1, n2, el, parentComponent);
   }
 
+  //更新props
+  function patchProps(oldProps, newProps, el) {
+    if (oldProps === newProps) return;
+    //设置新值
+    for (const key in newProps) {
+      if (newProps[key] !== oldProps[key]) {
+        hostPatchProp(el, key, newProps[key]);
+      }
+    }
+    if (oldProps !== EMPTY_OBJ) {
+      //原来有 现在没有了要删除
+      for (const key in oldProps) {
+        if (!hasOwn(newProps, key)) {
+          hostPatchProp(el, key, undefined);
+        }
+      }
+    }
+  }
   //更新子元素
   function patchChildren(n1, n2, container, parentComponent) {
     const preShapeFlags = n1.shapeFlags;

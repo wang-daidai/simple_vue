@@ -23,6 +23,8 @@ function capitalize(str) {
 function toHandlerKey(str) {
     return str ? "on" + capitalize(camelize(str)) : "";
 }
+//返回一个空对象
+const EMPTY_OBJ = {};
 
 //父组件将emit函数传给子组件
 //子组件触发这一函数，父组件根据emit中第一个参数事件名称
@@ -100,6 +102,7 @@ let targetsMap = new Map();
 function track(target, key) {
     if (!activeEffect)
         return;
+    //这里是target不是key bugfix
     let targetMap = targetsMap.get(target);
     if (!targetMap) {
         targetMap = new Map();
@@ -431,7 +434,7 @@ function createRenderer(options) {
         }
         else {
             //update
-            pathElement(preVnode, vnode);
+            patchElement(preVnode, vnode);
         }
     }
     //挂载组件
@@ -482,15 +485,37 @@ function createRenderer(options) {
         hostInsert(el, container);
     }
     //更新element
-    function pathElement(n1, n2, container, parentComponent) {
-        (n2.el = n1.el);
+    function patchElement(n1, n2, container, parentComponent) {
+        const el = (n2.el = n1.el);
+        const oldProps = n1.props || EMPTY_OBJ;
+        const newProps = n2.props || EMPTY_OBJ;
+        patchProps(oldProps, newProps, el);
         patchChildren(n1, n2);
+    }
+    //更新props
+    function patchProps(oldProps, newProps, el) {
+        if (oldProps === newProps)
+            return;
+        //设置新值
+        for (const key in newProps) {
+            if (newProps[key] !== oldProps[key]) {
+                hostPatchProp(el, key, newProps[key]);
+            }
+        }
+        if (oldProps !== EMPTY_OBJ) {
+            //原来有 现在没有了要删除
+            for (const key in oldProps) {
+                if (!hasOwn(newProps, key)) {
+                    hostPatchProp(el, key, undefined);
+                }
+            }
+        }
     }
     //更新子元素
     function patchChildren(n1, n2, container, parentComponent) {
         n1.shapeFlags;
         n2.shapeFlags;
-        console.log(n1, "就节点");
+        console.log(n1, "旧节点");
         console.log(n2, "新节点");
     }
     //挂载子组件
