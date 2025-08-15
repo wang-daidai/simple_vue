@@ -241,6 +241,13 @@ export function createRenderer(options) {
     for (let j = s1; j <= e1; j++) {
       const prevChild = c1[j];
       let newIndex;
+
+      //如果已经渲染的节点数量比实际需要的多，则直接删除当前节点
+      if (patched >= toBePatched) {
+        hostRemove(prevChild.el);
+        continue;
+      }
+
       if (prevChild.key != null) {
         //如果旧的元素有key则去映射表里查找
         newIndex = keyToMap.get(prevChild.key);
@@ -256,6 +263,8 @@ export function createRenderer(options) {
       //新的中不存在则删除
       if (!newIndex) {
         hostRemove(prevChild.el);
+      } else {
+        patched++;
       }
     }
   }
