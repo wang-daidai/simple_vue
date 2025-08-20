@@ -1,5 +1,6 @@
 import { ShapeFlags } from "@/shared/shapeFlags";
 import { createComponentInstance, setupComponent } from "./component";
+import { queueJobs } from "./scheduler";
 import { Fragment, Text } from "./vnode";
 import { createAppAPI } from "./createApp";
 import { effect } from "../reactivity";
@@ -34,7 +35,7 @@ export function createRenderer(options) {
           processElement(preVnode, vnode, container, parentComponent, anchor);
         } else if (shapeFlags & ShapeFlags.STATEFUL_COMPONENT) {
           //处理组件
-          processComponent(vnode, container, parentComponent);
+          processComponent(preVnode, vnode, container, parentComponent);
         }
     }
   }
@@ -49,8 +50,35 @@ export function createRenderer(options) {
     container.append(textNode);
   }
   //处理组件
-  function processComponent(vnode: any, container: any, parentComponent) {
-    mountComponent(vnode, container, parentComponent);
+  function processComponent(n1: any, n2: any, container: any, parentComponent) {
+    if (!n1) {
+      mountComponent(n2, container, parentComponent);
+    } else {
+      updateComponent(n1, n2, container, parentComponent);
+    }
+  }
+  //更新组件
+  function updateComponent(n1, n2, container, parentComponent) {
+    const instance = (n2.component = n1.component);
+
+    if (shouldUpdateComponent(n1, n2)) {
+      instance.next = n2;
+      instance.update();
+    } else {
+      //   instance.vnode = n2;
+    }
+  }
+  //根据props 判断是否要更新组件
+  function shouldUpdateComponent(prevVnode, nextVnode) {
+    const { props: prevProps } = prevVnode;
+    const { props: nextProps } = nextVnode;
+
+    for (const key in nextProps) {
+      if (nextProps[key] != prevProps[key]) {
+        return true;
+      }
+    }
+    return false;
   }
   //处理Element 节点
   function processElement(preVnode, vnode: any, container: any, parentComponent, anchor = null) {
@@ -65,7 +93,8 @@ export function createRenderer(options) {
 
   //挂载组件
   function mountComponent(initinalVnode: any, container: any, parentComponent) {
-    const instance = createComponentInstance(initinalVnode, parentComponent);
+    //在vnode上挂载组件实例
+    const instance = (initinalVnode.component = createComponentInstance(initinalVnode, parentComponent));
     setupComponent(instance);
     setupRenderEffect(instance, initinalVnode, container);
   }
@@ -73,28 +102,46 @@ export function createRenderer(options) {
   function setupRenderEffect(instance: any, initinalVnode: any, container: any) {
     //effect可以实现当setup中依赖的值修改后，再次渲染元素
     //配合元素更新逻辑，否则会生成新的dom元素
-    effect(() => {
-      const { proxy } = instance;
-      if (!instance.isMounted) {
-        //subTree 为组件对应的vnode
-        const subTree = (instance.subTree = instance.render.call(proxy));
-        //第一次挂载
-        //组件转换完毕后，再次patch vnode=>element
-        path(null, subTree, container, instance);
-        instance.isMounted = true;
-        //等element挂载完毕后，再赋值el
-        initinalVnode.el = subTree.el;
-      } else {
-        //更新节点
-        const subTree = instance.render.call(proxy, proxy);
-        //prevSubTree更新前的节点
-        const prevSubTree = instance.subTree;
-        path(prevSubTree, subTree, container, instance);
-        instance.subTree = subTree;
+    instance.update = effect(
+      () => {
+        const { proxy, next } = instance;
+        if (!instance.isMounted) {
+          //subTree 为组件对应的vnode
+          const subTree = (instance.subTree = instance.render.call(proxy));
+          //第一次挂载
+          //组件转换完毕后，再次patch vnode=>element
+          path(null, subTree, container, instance);
+          instance.isMounted = true;
+          //等element挂载完毕后，再赋值el
+          initinalVnode.el = subTree.el;
+        } else {
+          if (next) {
+            updateComponentPreRender(instance, next);
+          }
+          //更新节点
+          const subTree = instance.render.call(proxy, proxy);
+
+          //prevSubTree更新前的节点
+          const prevSubTree = instance.subTree;
+          path(prevSubTree, subTree, container, instance);
+          instance.subTree = subTree;
+        }
+      },
+      {
+        scheduler() {
+          console.log("update-scheduler");
+          queueJobs(instance.update);
+        },
       }
-    });
+    );
   }
 
+  //更新组件属性
+  function updateComponentPreRender(instance, nextVnode) {
+    instance.vnode = nextVnode;
+    instance.next = null;
+    instance.props = nextVnode.props;
+  }
   //挂载element
   function mountElement(vnode: any, container: any, parentComponent, anchor) {
     const { type, props, children, shapeFlags } = vnode;
@@ -114,6 +161,10 @@ export function createRenderer(options) {
 
   //更新element
   function patchElement(n1, n2, container, parentComponent) {
+    console.log("patchElement");
+    console.log(n1, "n1");
+    console.log(n2, "n2");
+
     const el = (n2.el = n1.el);
 
     const oldProps = n1.props || EMPTY_OBJ;
@@ -174,9 +225,6 @@ export function createRenderer(options) {
     }
   }
   function patchKeyedChildren(c1, c2, container, parentComponent) {
-    console.log(c1, "c1");
-    console.log(c2, "c2");
-
     let i = 0;
     let e1 = c1.length - 1;
     let e2 = c2.length - 1;

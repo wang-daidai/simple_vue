@@ -38,6 +38,7 @@ function emitEvent(instance, eventName, ...args) {
 const publicPropertiesMap = {
     $el: (i) => i.vnode.el,
     $slots: (i) => i.slots,
+    $props: (i) => i.props,
 };
 const PublicInstanceProxyHandlers = {
     get({ _: instance }, key) {
@@ -268,6 +269,7 @@ function proxyRefs(raw) {
 function createComponentInstance(vnode, parentComponent) {
     const component = {
         vnode,
+        next: null,
         type: vnode.type,
         setupState: {},
         proxy: null,
@@ -330,6 +332,32 @@ function setCurrentInstance(instance) {
     currentInstance = instance;
 }
 
+const queue = [];
+let isFlushPending = false;
+function queueJobs(job) {
+    if (!queue.includes(job)) {
+        queue.push(job);
+    }
+    queueFlush();
+}
+function queueFlush() {
+    if (isFlushPending)
+        return;
+    isFlushPending = true;
+    //isFlushPending 防止创建多个promise
+    nextTick(flushJobs);
+}
+function flushJobs() {
+    isFlushPending = false;
+    let job;
+    while ((job = queue.shift())) {
+        job && job();
+    }
+}
+function nextTick(fn) {
+    return fn ? Promise.resolve().then(fn) : Promise.resolve();
+}
+
 const Fragment = Symbol("Fragment");
 const Text = Symbol("Text");
 function createVNode(type, props, children) {
@@ -337,6 +365,7 @@ function createVNode(type, props, children) {
         type,
         props,
         children,
+        component: null,
         shapeFlags: getShapeFlage(type),
         key: props && props.key,
     };
@@ -407,7 +436,7 @@ function createRenderer(options) {
                 }
                 else if (shapeFlags & 2 /* ShapeFlags.STATEFUL_COMPONENT */) {
                     //处理组件
-                    processComponent(vnode, container, parentComponent);
+                    processComponent(preVnode, vnode, container, parentComponent);
                 }
         }
     }
@@ -422,8 +451,32 @@ function createRenderer(options) {
         container.append(textNode);
     }
     //处理组件
-    function processComponent(vnode, container, parentComponent) {
-        mountComponent(vnode, container, parentComponent);
+    function processComponent(n1, n2, container, parentComponent) {
+        if (!n1) {
+            mountComponent(n2, container, parentComponent);
+        }
+        else {
+            updateComponent(n1, n2);
+        }
+    }
+    //更新组件
+    function updateComponent(n1, n2, container, parentComponent) {
+        const instance = (n2.component = n1.component);
+        if (shouldUpdateComponent(n1, n2)) {
+            instance.next = n2;
+            instance.update();
+        }
+    }
+    //根据props 判断是否要更新组件
+    function shouldUpdateComponent(prevVnode, nextVnode) {
+        const { props: prevProps } = prevVnode;
+        const { props: nextProps } = nextVnode;
+        for (const key in nextProps) {
+            if (nextProps[key] != prevProps[key]) {
+                return true;
+            }
+        }
+        return false;
     }
     //处理Element 节点
     function processElement(preVnode, vnode, container, parentComponent, anchor = null) {
@@ -438,15 +491,16 @@ function createRenderer(options) {
     }
     //挂载组件
     function mountComponent(initinalVnode, container, parentComponent) {
-        const instance = createComponentInstance(initinalVnode, parentComponent);
+        //在vnode上挂载组件实例
+        const instance = (initinalVnode.component = createComponentInstance(initinalVnode, parentComponent));
         setupComponent(instance);
         setupRenderEffect(instance, initinalVnode, container);
     }
     function setupRenderEffect(instance, initinalVnode, container) {
         //effect可以实现当setup中依赖的值修改后，再次渲染元素
         //配合元素更新逻辑，否则会生成新的dom元素
-        effect(() => {
-            const { proxy } = instance;
+        instance.update = effect(() => {
+            const { proxy, next } = instance;
             if (!instance.isMounted) {
                 //subTree 为组件对应的vnode
                 const subTree = (instance.subTree = instance.render.call(proxy));
@@ -458,6 +512,9 @@ function createRenderer(options) {
                 initinalVnode.el = subTree.el;
             }
             else {
+                if (next) {
+                    updateComponentPreRender(instance, next);
+                }
                 //更新节点
                 const subTree = instance.render.call(proxy, proxy);
                 //prevSubTree更新前的节点
@@ -465,7 +522,18 @@ function createRenderer(options) {
                 path(prevSubTree, subTree, container, instance);
                 instance.subTree = subTree;
             }
+        }, {
+            scheduler() {
+                console.log("update-scheduler");
+                queueJobs(instance.update);
+            },
         });
+    }
+    //更新组件属性
+    function updateComponentPreRender(instance, nextVnode) {
+        instance.vnode = nextVnode;
+        instance.next = null;
+        instance.props = nextVnode.props;
     }
     //挂载element
     function mountElement(vnode, container, parentComponent, anchor) {
@@ -485,6 +553,9 @@ function createRenderer(options) {
     }
     //更新element
     function patchElement(n1, n2, container, parentComponent) {
+        console.log("patchElement");
+        console.log(n1, "n1");
+        console.log(n2, "n2");
         const el = (n2.el = n1.el);
         const oldProps = n1.props || EMPTY_OBJ;
         const newProps = n2.props || EMPTY_OBJ;
@@ -542,8 +613,6 @@ function createRenderer(options) {
         }
     }
     function patchKeyedChildren(c1, c2, container, parentComponent) {
-        console.log(c1, "c1");
-        console.log(c2, "c2");
         let i = 0;
         let e1 = c1.length - 1;
         let e2 = c2.length - 1;
@@ -658,6 +727,7 @@ function createRenderer(options) {
                 path(null, nextChild, container, parentComponent, anchor);
             }
             else if (moved) {
+                //TODO 这部分逻辑 不太理解 怎么就实现了
                 if (j < 0 || i != increasingNewIndexSequence[j]) {
                     hostInsert(nextChild.el, container, anchor);
                 }
@@ -823,4 +893,4 @@ function createApp(rootComponent) {
     return renderer.createApp(rootComponent);
 }
 
-export { ReactiveEffect, createApp, createAppAPI, createRenderer, createTextVNode, effect, getCurrentInstance, h, inject, isProxy, isReactive, isReadonly, isRef, provide, proxyRefs, reactive, readonly, ref, renderSlots, shallowReadonly, stop, track, trackEffect, trigger, triggerEffect, unRef };
+export { ReactiveEffect, createApp, createAppAPI, createRenderer, createTextVNode, effect, getCurrentInstance, h, inject, isProxy, isReactive, isReadonly, isRef, nextTick, provide, proxyRefs, reactive, readonly, ref, renderSlots, shallowReadonly, stop, track, trackEffect, trigger, triggerEffect, unRef };

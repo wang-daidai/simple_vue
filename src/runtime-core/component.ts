@@ -8,6 +8,7 @@ import { proxyRefs, shallowReadonly } from "../reactivity";
 export function createComponentInstance(vnode: any, parentComponent) {
   const component = {
     vnode,
+    next: null,
     type: vnode.type,
     setupState: {},
     proxy: null,
