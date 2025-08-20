@@ -18,6 +18,8 @@ export default {
   render() {
     const self = this;
 
-    return self.isChange === true ? h("div", {}, nextChildren) : h("div", {}, prevChildren);
+    return self.isChange === true
+      ? h("div", { class: "next" }, nextChildren)
+      : h("div", { class: "prev" }, prevChildren);
   },
 };

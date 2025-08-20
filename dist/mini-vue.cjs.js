@@ -490,75 +490,70 @@ function createRenderer(options) {
         const el = (n2.el = n1.el);
         const oldProps = n1.props || EMPTY_OBJ;
         const newProps = n2.props || EMPTY_OBJ;
+        //更新props
         patchProps(oldProps, newProps, el);
+        //更新children
         patchChildren(n1, n2, el, parentComponent);
     }
     //更新props
     function patchProps(oldProps, newProps, el) {
         if (oldProps === newProps)
             return;
-        //设置新值
-        for (const key in newProps) {
-            if (newProps[key] !== oldProps[key]) {
+        for (const key of Object.keys(newProps)) {
+            if (newProps[key] != oldProps[key]) {
                 hostPatchProp(el, key, newProps[key]);
             }
         }
         if (oldProps !== EMPTY_OBJ) {
-            //原来有 现在没有了要删除
-            for (const key in oldProps) {
+            for (const key of Object.keys(oldProps)) {
                 if (!hasOwn(newProps, key)) {
-                    hostPatchProp(el, key, undefined);
+                    hostPatchProp(el, key, null);
                 }
             }
         }
     }
     //更新子元素
     function patchChildren(n1, n2, container, parentComponent) {
-        const { shapeFlags: preShapeFlags, children: preChildren } = n1;
-        const { children: nextChildren, shapeFlags: nextShapeFlags } = n2;
-        //新节点的元素内容是文本
+        const { shapeFlags: prevShapeFlags, children: prevChildren } = n1;
+        const { shapeFlags: nextShapeFlags, children: nextChildren, el } = n2;
+        //新的是文本
         if (nextShapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
-            //老的是数组
-            if (preShapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
-                //删除老的内容
-                unmountChildren(preChildren);
-            }
-            //老的是文本
-            if (preShapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
-                if (preChildren === nextChildren) {
+            //老的也是文本
+            if (prevShapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
+                if (nextChildren === prevChildren) {
                     return;
                 }
             }
-            hostSetElementText(nextChildren, container);
+            //老的是数组
+            if (prevShapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
+                unmountChildren(prevChildren);
+            }
+            hostSetElementText(nextChildren, el);
         }
         //新的是数组
         if (nextShapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
-            //老的是数组
-            if (preShapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
-                patchKeyedChildren(preChildren, nextChildren, container, parentComponent);
-            }
             //老的是文本
-            if (preShapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
-                //将老的文本置为空
-                hostSetElementText("", container);
-                //创建新的
-                mountChildren(nextChildren, container, parentComponent);
+            if (prevShapeFlags & 4 /* ShapeFlags.TEXT_CHILDREN */) {
+                hostSetElementText("", el);
+                mountChildren(nextChildren, el, parentComponent);
+            }
+            //老的是数组
+            if (prevShapeFlags & 8 /* ShapeFlags.ARRAY_CHILDREN */) {
+                patchKeyedChildren(prevChildren, nextChildren, container, parentComponent);
             }
         }
     }
     function patchKeyedChildren(c1, c2, container, parentComponent) {
-        console.log(c1, "旧节点");
-        console.log(c2, "新节点");
-        console.log(container, "container");
+        console.log(c1, "c1");
+        console.log(c2, "c2");
         let i = 0;
         let e1 = c1.length - 1;
         let e2 = c2.length - 1;
-        //左侧
+        //左边对比
         while (i <= e1 && i <= e2) {
             const n1 = c1[i];
             const n2 = c2[i];
             if (isSameVNodeType(n1, n2)) {
-                //相同节点进一步对比渲染
                 path(n1, n2, container, parentComponent);
             }
             else {
@@ -566,8 +561,8 @@ function createRenderer(options) {
             }
             i++;
         }
-        //右侧
-        while (i <= e1 && i <= e2) {
+        //右边对比
+        while (e1 >= i && e2 >= i) {
             const n1 = c1[e1];
             const n2 = c2[e2];
             if (isSameVNodeType(n1, n2)) {
@@ -580,18 +575,23 @@ function createRenderer(options) {
             e2--;
         }
         //新的比老的长
-        if (i > e1 && i <= e2) {
-            //这里要使用inserNode 如何新增的在左侧则要使用anchor锚点插入
-            let inserNode = c2[e2 + 1] ? c2[e2 + 1].el : null;
-            for (let j = i; j <= e2; j++) {
-                path(null, c2[j], container, parentComponent, inserNode);
+        if (i >= e1 && i <= e2) {
+            //新的比老的 长在右边
+            //   for (let j = i; j <= e2; j++) {
+            //     path(null, c2[j], container, parentComponent);
+            //   }
+            //新的比老的 长在左边
+            //使用倒序遍历，保证锚点是稳定的，如果锚点为null，则相当于节点挂载在尾部，和长在右边一样
+            for (let j = e2; j >= i; j--) {
+                let insertNode = c2[j + 1] ? c2[j + 1].el : null;
+                path(null, c2[j], container, parentComponent, insertNode);
             }
         }
         //老的比新的长
-        if (i > e2 && i <= e1) {
+        if (i >= e2 && i <= e1) {
             for (let j = i; j <= e1; j++) {
-                //删除多出来的
-                hostRemove(c1[j].el);
+                const child = c1[j].el;
+                hostRemove(child);
             }
         }
         //中间对比
@@ -601,7 +601,11 @@ function createRenderer(options) {
         //toBePatched 要新增的节点数
         const toBePatched = e2 - i + 1;
         const keyToMap = new Map();
-        //记录是否需要移动位置
+        //把新节点的key存取来 key=>新序列中的下标
+        for (let j = s2; j <= e2; j++) {
+            const nextChild = c2[j];
+            keyToMap.set(nextChild.key, j);
+        }
         let moved = false;
         let maxNewIndexSoFar = 0;
         //创建一个定长数组，这样性能是最好的
@@ -609,25 +613,19 @@ function createRenderer(options) {
         for (let j = 0; j < toBePatched; j++) {
             newIndexToOldIndexMap[j] = 0;
         }
-        //把新节点的key存取来 key=>新序列中的下标  {e:2,c:3,d:4}
-        for (let j = s2; j <= e2; j++) {
-            const nextChild = c2[j];
-            keyToMap.set(nextChild.key, j);
-        }
         for (let j = s1; j <= e1; j++) {
             const prevChild = c1[j];
-            let newIndex;
-            //如果已经渲染的节点数量比实际需要的多，则直接删除当前节点
+            //如果已经挂载的数量已经等于需要挂载的数量了，则后续的老节点都删除
             if (patched >= toBePatched) {
                 hostRemove(prevChild.el);
                 continue;
             }
+            let newIndex;
+            //查找新的中有没有老的节点
             if (prevChild.key != null) {
-                //如果旧的元素有key则去映射表里查找
                 newIndex = keyToMap.get(prevChild.key);
             }
             else {
-                //没有key则遍历查找
                 for (let k = s1; k <= e2; k++) {
                     if (isSameVNodeType(prevChild, c2[k])) {
                         newIndex = k;
@@ -635,8 +633,7 @@ function createRenderer(options) {
                     }
                 }
             }
-            //新的中不存在则删除
-            if (!newIndex) {
+            if (!newIndex && newIndex !== 0) {
                 hostRemove(prevChild.el);
             }
             else {
@@ -646,34 +643,14 @@ function createRenderer(options) {
                 else {
                     moved = true;
                 }
-                //一种神奇的转化，映射新children中节点的顺序，提供出来 用于计算最长递增子序列
-                //5.2.1 newIndexToOldIndexMap = [5,3,4] 得到的最长子序列是[1,2]
-                //赋值是 j 有可能为0 因为实际使用时0代表这个节点在老的中没有出现过，需要创建
-                //则赋值时加1，避免赋值0
                 newIndexToOldIndexMap[newIndex - s2] = j + 1;
                 path(prevChild, c2[newIndex], container, parentComponent);
-                //新的中存在 渲染的节点数 patched++
                 patched++;
             }
         }
-        //getSequence 计算最长递增子序列比较费性能
-        //所以可以判断，节点是否需要移动，如果不需要移动位置则就不计算了
         const increasingNewIndexSequence = moved ? getSequence(newIndexToOldIndexMap) : [];
-        // let j = 0;
-        // for (let i = 0; i < patched; i++) {
-        //   //如果这个元素没有出现在最长子序列中，则表示该元素需要移动
-        //   //如i=0代表5 表示d节点，因为最长序列中第一个元素是1，不为0
-        //   //表明d节点不在稳定序列中，需要移动该节点
-        //   if (i !== increasingNewIndexSequence[j]) {
-        //因为要调整位置时，需要确定插入在哪个位置前，例如这里要调整e的位置，e此时是第一个节点，要插入到节点c之前
-        //c有可能不在稳定序列中，也需要调整位置，因此不能这样按正序去计算
-        //要用倒叙去处理，最后一个节点插在f节点前，f节点是固定的
-        //     console.log("移动位置");
-        //   } else {
-        //     j++;
-        //   }
-        // }
         let j = increasingNewIndexSequence.length - 1;
+        //倒序
         for (let i = toBePatched - 1; i >= 0; i--) {
             const newIndex = i + s2;
             const nextChild = c2[newIndex];
@@ -683,9 +660,7 @@ function createRenderer(options) {
                 path(null, nextChild, container, parentComponent, anchor);
             }
             else if (moved) {
-                //j小于0后，直接移动
-                if (j < 0 || i !== increasingNewIndexSequence[j]) {
-                    //移动位置
+                if (j < 0 || i != increasingNewIndexSequence[j]) {
                     hostInsert(nextChild.el, container, anchor);
                 }
                 else {

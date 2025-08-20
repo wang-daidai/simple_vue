@@ -42,7 +42,7 @@ import { ref, h } from "../../dist/mini-vue.esm.js";
 // 右侧
 // (a b)
 // d c (a b)
-// i = 0, e1 = -1, e2 = 0
+// i = 0, e1 = -1, e2 = 1
 // const prevChildren = [h("p", { key: "A" }, "A"), h("p", { key: "B" }, "B")];
 // const nextChildren = [
 //   h("p", { key: "D" }, "D"),
@@ -56,7 +56,7 @@ import { ref, h } from "../../dist/mini-vue.esm.js";
 // 左侧
 // (a b) c d
 // (a b)
-// i = 2, e1 = 2, e2 = 1
+// i = 2, e1 = 3, e2 = 1
 // const prevChildren = [
 //   h("p", { key: "A" }, "A"),
 //   h("p", { key: "B" }, "B"),
@@ -68,7 +68,7 @@ import { ref, h } from "../../dist/mini-vue.esm.js";
 // 右侧
 // a b (c d)
 // (c d)
-// i = 0, e1 = 0, e2 = -1
+// i = 0, e1 = 1, e2 = -1
 
 // const prevChildren = [
 //   h("p", { key: "A" }, "A"),
@@ -78,11 +78,26 @@ import { ref, h } from "../../dist/mini-vue.esm.js";
 // ];
 // const nextChildren = [h("p", { key: "C" }, "C"), h("p", { key: "D" }, "D")];
 
+// 两侧
+// a b (c d) e f
+// (c d)
+// i = 0, e1 = 5, e2 = 1
+// const prevChildren = [
+//   h("p", { key: "A" }, "A"),
+//   h("p", { key: "B" }, "B"),
+//   h("p", { key: "C" }, "C"),
+//   h("p", { key: "D" }, "D"),
+//   h("p", { key: "E" }, "E"),
+//   h("p", { key: "F" }, "F"),
+// ];
+// const nextChildren = [h("p", { key: "C" }, "C"), h("p", { key: "D" }, "D")];
+
 // 5. 对比中间的部分
 // 删除老的  (在老的里面存在，新的里面不存在)
 // 5.1
 // a,b,(c,d),f,g
 // a,b,(e,c),f,g
+// i = 1 e1 = 3  e2 = 3
 // D 节点在新的里面是没有的 - 需要删除掉
 // C 节点 props 也发生了变化
 
@@ -130,19 +145,42 @@ import { ref, h } from "../../dist/mini-vue.esm.js";
 // 2 移动 (节点存在于新的和老的里面，但是位置变了)
 
 // 2.1
-// a,b,(c,d,e),f,g
-// a,b,(e,c,d),f,g
-// i=2 e1=4  e2=4
-//老的顺序是 2 3 4
-//新的顺序是 4 2 3
-// 最长递增子序列： [1,2]
+// a,b,(c,d,e,h,i),f,g
+// a,b,(h,c,d,i,e),f,g
+// i=2 e1=6  e2=6
 // c d 是稳定的序列 这部分不用调整位置，只要调整其余节点的顺序即可，提高了效率
-
 // const prevChildren = [
 //   h("p", { key: "A" }, "A"),
 //   h("p", { key: "B" }, "B"),
 //   h("p", { key: "C" }, "C"),
 //   h("p", { key: "D" }, "D"),
+//   h("p", { key: "E" }, "E"),
+//   h("p", { key: "H" }, "H"),
+//   h("p", { key: "I" }, "I"),
+//   h("p", { key: "F" }, "F"),
+//   h("p", { key: "G" }, "G"),
+// ];
+
+// const nextChildren = [
+//   h("p", { key: "A" }, "A"),
+//   h("p", { key: "B" }, "B"),
+//   h("p", { key: "H" }, "H"),
+//   h("p", { key: "C" }, "C"),
+//   h("p", { key: "D" }, "D"),
+//   h("p", { key: "I" }, "I"),
+//   h("p", { key: "E" }, "E"),
+//   h("p", { key: "F" }, "F"),
+//   h("p", { key: "G" }, "G"),
+// ];
+
+// 3. 创建新的节点
+// a,b,(c,e),f,g
+// a,b,(e,c,d),f,g
+// d 节点在老的节点中不存在，新的里面存在，所以需要创建
+// const prevChildren = [
+//   h("p", { key: "A" }, "A"),
+//   h("p", { key: "B" }, "B"),
+//   h("p", { key: "C" }, "C"),
 //   h("p", { key: "E" }, "E"),
 //   h("p", { key: "F" }, "F"),
 //   h("p", { key: "G" }, "G"),
@@ -157,29 +195,6 @@ import { ref, h } from "../../dist/mini-vue.esm.js";
 //   h("p", { key: "F" }, "F"),
 //   h("p", { key: "G" }, "G"),
 // ];
-
-// 3. 创建新的节点
-// a,b,(c,e),f,g
-// a,b,(e,c,d),f,g
-// d 节点在老的节点中不存在，新的里面存在，所以需要创建
-const prevChildren = [
-  h("p", { key: "A" }, "A"),
-  h("p", { key: "B" }, "B"),
-  h("p", { key: "C" }, "C"),
-  h("p", { key: "E" }, "E"),
-  h("p", { key: "F" }, "F"),
-  h("p", { key: "G" }, "G"),
-];
-
-const nextChildren = [
-  h("p", { key: "A" }, "A"),
-  h("p", { key: "B" }, "B"),
-  h("p", { key: "E" }, "E"),
-  h("p", { key: "C" }, "C"),
-  h("p", { key: "D" }, "D"),
-  h("p", { key: "F" }, "F"),
-  h("p", { key: "G" }, "G"),
-];
 
 // 综合例子
 // a,b,(c,d,e,z),f,g
@@ -208,9 +223,9 @@ const nextChildren = [
 // ];
 
 // fix c 节点应该是 move 而不是删除之后重新创建的
-// const prevChildren = [h("p", { key: "A" }, "A"), h("p", {}, "C"), h("p", { key: "B" }, "B"), h("p", { key: "D" }, "D")];
+const prevChildren = [h("p", { key: "A" }, "A"), h("p", {}, "C"), h("p", { key: "B" }, "B"), h("p", { key: "D" }, "D")];
 
-// const nextChildren = [h("p", { key: "A" }, "A"), h("p", { key: "B" }, "B"), h("p", {}, "C"), h("p", { key: "D" }, "D")];
+const nextChildren = [h("p", { key: "A" }, "A"), h("p", { key: "B" }, "B"), h("p", {}, "C"), h("p", { key: "D" }, "D")];
 
 export default {
   name: "ArrayToArray",
