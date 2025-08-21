@@ -59,13 +59,20 @@ export function createRenderer(options) {
   }
   //更新组件
   function updateComponent(n1, n2, container, parentComponent) {
-    const instance = (n2.component = n1.component);
+    //当外部组件更新时，父组件实例会再次调用render，生成组件最新的 subTree
+    //然后进行path
+    //组件更新时主要是对比props有无发生变化
 
+    //如果没有发生变化
+    //则为最新的subTree也就是n2，赋值 component，component为组件实例，因为render update等方法都在组件实例上
+    // 所以该步骤可保证后续组件更新正常
+
+    // 同时因为el是在组件初次挂载时才会赋值的，因此这里要为n2赋值el
+    const instance = (n2.component = n1.component);
+    n2.el = n1.el;
     if (shouldUpdateComponent(n1, n2)) {
       instance.next = n2;
       instance.update();
-    } else {
-      //   instance.vnode = n2;
     }
   }
   //根据props 判断是否要更新组件
@@ -129,7 +136,6 @@ export function createRenderer(options) {
       },
       {
         scheduler() {
-          console.log("update-scheduler");
           queueJobs(instance.update);
         },
       }
@@ -161,10 +167,6 @@ export function createRenderer(options) {
 
   //更新element
   function patchElement(n1, n2, container, parentComponent) {
-    console.log("patchElement");
-    console.log(n1, "n1");
-    console.log(n2, "n2");
-
     const el = (n2.el = n1.el);
 
     const oldProps = n1.props || EMPTY_OBJ;

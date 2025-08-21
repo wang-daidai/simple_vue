@@ -332,17 +332,33 @@ function setCurrentInstance(instance) {
     currentInstance = instance;
 }
 
+/**
+ * 异步渲染逻辑
+ * 例如nextTick这个example这个例子中，遍历修改count 如果采用同步渲染策略，则遍历几次就会重新渲染几次
+ * 和只渲染遍历结束后的最终值，是一样效果，所以同步渲染显然会导致性能浪费，
+ *
+ * 实际渲染配合efffect中的 scheduler 配置和队列来实现异步，只渲染一次
+ * 首先当effect函数中配置了scheduler后，当依赖修改后，会调用scheduler
+ * 在scheduler中放置组件更新方法
+ *
+ * 将组件update事件放入一个非重复的队列中，保证队列中只存在一个组件更新的方法
+ * 同时将这个更新的方法设置为微任务，这样可以保证在所有遍历等同步任务完成
+ * 才执行更新逻辑，同时数据为最新数据
+ *
+ * 这里用promise 来实现更新方法为微任务
+ *
+ * **/
 const queue = [];
 let isFlushPending = false;
 function queueJobs(job) {
+    if (isFlushPending)
+        return;
     if (!queue.includes(job)) {
         queue.push(job);
     }
     queueFlush();
 }
 function queueFlush() {
-    if (isFlushPending)
-        return;
     isFlushPending = true;
     //isFlushPending 防止创建多个promise
     nextTick(flushJobs);
@@ -354,8 +370,9 @@ function flushJobs() {
         job && job();
     }
 }
+let p = Promise.resolve();
 function nextTick(fn) {
-    return fn ? Promise.resolve().then(fn) : Promise.resolve();
+    return fn ? p.then(fn) : p;
 }
 
 const Fragment = Symbol("Fragment");
@@ -419,6 +436,7 @@ function createRenderer(options) {
         path(null, vnode, container, null);
     }
     function path(preVnode, vnode, container, parentComponent, anchor = null) {
+        console.log("组件跟新 path", preVnode, vnode);
         const { shapeFlags, type } = vnode;
         //区分vnode中的type
         switch (type) {
@@ -461,7 +479,15 @@ function createRenderer(options) {
     }
     //更新组件
     function updateComponent(n1, n2, container, parentComponent) {
+        //当外部组件更新时，父组件实例会再次调用render，生成组件最新的 subTree
+        //然后进行path
+        //组件更新时主要是对比props有无发生变化
+        //如果没有发生变化
+        //则为最新的subTree也就是n2，赋值 component，component为组件实例，因为render update等方法都在组件实例上
+        // 所以该步骤可保证后续组件更新正常
+        // 同时因为el是在组件初次挂载时才会赋值的，因此这里要为n2赋值el
         const instance = (n2.component = n1.component);
+        n2.el = n1.el;
         if (shouldUpdateComponent(n1, n2)) {
             instance.next = n2;
             instance.update();
@@ -524,7 +550,6 @@ function createRenderer(options) {
             }
         }, {
             scheduler() {
-                console.log("update-scheduler");
                 queueJobs(instance.update);
             },
         });
@@ -553,9 +578,6 @@ function createRenderer(options) {
     }
     //更新element
     function patchElement(n1, n2, container, parentComponent) {
-        console.log("patchElement");
-        console.log(n1, "n1");
-        console.log(n2, "n2");
         const el = (n2.el = n1.el);
         const oldProps = n1.props || EMPTY_OBJ;
         const newProps = n2.props || EMPTY_OBJ;

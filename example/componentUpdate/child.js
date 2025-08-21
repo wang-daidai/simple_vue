@@ -4,6 +4,8 @@ export default {
   name: "Child",
   setup(props, { emit }) {},
   render() {
+    window.self = this;
+
     return h("div", {}, [h("div", {}, "child - props - msg:" + this.$props.msg)]);
   },
 };
